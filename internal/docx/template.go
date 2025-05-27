@@ -3,6 +3,7 @@ package docx
 import (
 	"archive/zip"
 	"bytes"
+	"fmt"
 	"io"
 	"regexp"
 	"strings"
@@ -33,12 +34,12 @@ func patchXML(srcXML string) string {
 func applyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]mediaRel, error) {
 	documentFile, err := f.Open()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to open document file %s: %w", f.Name, err)
 	}
 
 	documentXML, err := io.ReadAll(documentFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to read document file %s: %w", f.Name, err)
 	}
 	documentXML = []byte(patchXML(string(documentXML)))
 
@@ -49,7 +50,7 @@ func applyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]mediaRel, er
 		}).
 		Parse(string(documentXML))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to parse template in file %s: %w", f.Name, err)
 	}
 
 	appliedTemplate := bytes.Buffer{}
@@ -57,7 +58,7 @@ func applyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]mediaRel, er
 
 	output, media, err := applyImages(appliedTemplate.String())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to apply images in file %s: %w", f.Name, err)
 	}
 	output = postProcessing(output)
 

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"regexp"
 )
 
 type Template struct {
@@ -23,6 +22,9 @@ func NewTemplate(templateFile string) *Template {
 		templateFile: templateFile,
 		output:       bytes.Buffer{},
 		isApplied:    false,
+		media:        []media{},
+		rel:          &relationship{},
+		relMedia:     []mediaRel{},
 	}
 }
 
@@ -38,7 +40,7 @@ func (t *Template) Apply(data any) error {
 
 	r, err := zip.OpenReader(t.templateFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to open template file %s: %w", t.templateFile, err)
 	}
 	defer r.Close()
 
@@ -46,7 +48,7 @@ func (t *Template) Apply(data any) error {
 		filename := path.Join("word/media", m.filename)
 		err = writeFile(filename, zipWriter, m.data)
 		if err != nil {
-			return err
+			return fmt.Errorf("unable to write media file %s: %w", filename, err)
 		}
 	}
 
@@ -73,7 +75,7 @@ func (t *Template) Apply(data any) error {
 
 	toApplyTemplate := []string{
 		"word/document.xml",
-		// "word/header.xml",
+		"word/header.xml",
 		"word/footer.xml",
 	}
 
@@ -88,12 +90,12 @@ func (t *Template) Apply(data any) error {
 			// I don't know how many headers there are, so I use a regex,
 			// also the "toApplyTemplate" array had a "word/header.xml"
 			// which I didn't have in my docx/word folder
-			matched, err := regexp.Match("word/header[0-9].xml", []byte(f.Name))
-			if err != nil {
-				return fmt.Errorf("regexp.Match error: %w", err)
-			}
+			// matched, err := regexp.Match("word/header[0-9].xml", []byte(f.Name))
+			// if err != nil {
+			// 	return fmt.Errorf("regexp.Match error: %w", err)
+			// }
 
-			if f.Name != toApplyTemplateFile && !matched {
+			if f.Name != toApplyTemplateFile {
 				continue
 			}
 			toEdit = true
@@ -111,7 +113,7 @@ func (t *Template) Apply(data any) error {
 			if !skipFile {
 				err = copyOriginalFile(f, zipWriter)
 				if err != nil {
-					return err
+					return fmt.Errorf("unable to copy original file %s: %w", f.Name, err)
 				}
 			}
 
@@ -120,7 +122,7 @@ func (t *Template) Apply(data any) error {
 
 		media, err := applyTemplate(f, zipWriter, data)
 		if err != nil {
-			return err
+			return fmt.Errorf("unable to apply template to file %s: %w", f.Name, err)
 		}
 
 		t.relMedia = append(t.relMedia, media...)
@@ -179,7 +181,7 @@ func (t *Template) Apply(data any) error {
 
 	err = zipWriter.Close()
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to close zip writer: %w", err)
 	}
 
 	t.isApplied = true

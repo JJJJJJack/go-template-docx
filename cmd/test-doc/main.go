@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"testdocx/internal/docx"
 )
@@ -10,6 +11,7 @@ type Row struct {
 	Text        string
 	Description string
 	Icon        string
+	A           string
 }
 
 type Data struct {
@@ -32,6 +34,7 @@ func main() {
 				Text:        "Lorem Ipsum",
 				Description: "Lorem Ipsum descript",
 				Icon:        "generic.png",
+				A:           "test",
 			},
 			{
 				Title:       "Prova2",
@@ -53,6 +56,13 @@ func main() {
 	template.Media("ap.png", readFile("ap.png"))
 	template.Media("windows.png", readFile("windows.png"))
 
-	template.Apply(data)
-	template.Save("output.docx")
+	err := template.Apply(data)
+	if err != nil {
+		fmt.Println("Error applying template:", err)
+	}
+
+	err = template.Save("output.docx")
+	if err != nil {
+		fmt.Println("Error saving template:", err)
+	}
 }
