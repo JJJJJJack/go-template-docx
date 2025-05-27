@@ -1,2 +1,4 @@
 *.docx
 .DS_Store
+output
+.~lock*
