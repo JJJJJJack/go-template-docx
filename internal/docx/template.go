@@ -11,6 +11,8 @@ import (
 )
 
 func patchXML(srcXML string) string {
+	// htmlDecoded := html.UnescapeString(srcXML)
+
 	// Fix separated [[
 	re := regexp.MustCompile(`\[([\s\S]*?)\[`)
 	srcXML = re.ReplaceAllString(srcXML, "[[")
@@ -23,7 +25,25 @@ func patchXML(srcXML string) string {
 	re = regexp.MustCompile(`\[\[[\s\S]*?\]\]`)
 	matches := re.FindAllString(srcXML, -1)
 	for _, match := range matches {
-		xmlRegex := regexp.MustCompile(`(<\s*\/?[\w-:.]+(\s+[^>]*?)?\s*>)`)
+		xmlRegex := regexp.MustCompile(`(<\s*\/?[\w-:.]+(\s+[^>]*?)?[\s\/]*>)`)
+		templateText := xmlRegex.ReplaceAllString(match, "")
+		srcXML = strings.ReplaceAll(srcXML, match, templateText)
+	}
+
+	// Remove unecessary XML tags between [[if ...]] and [[else]]
+	re = regexp.MustCompile(`\[\[if\s+.*?\]\][\s\S]*?\[\[else\]\]`)
+	matches = re.FindAllString(srcXML, -1)
+	for _, match := range matches {
+		xmlRegex := regexp.MustCompile(`(<\s*\/?[\w-:.]+(\s+[^>]*?)?[\s\/]*>)`)
+		templateText := xmlRegex.ReplaceAllString(match, "")
+		srcXML = strings.ReplaceAll(srcXML, match, templateText)
+	}
+
+	// Remove unecessary XML tags between [[else]] and [[end]]
+	re = regexp.MustCompile(`\[\[else\]\][\s\S]*?\[\[end\]\]`)
+	matches = re.FindAllString(srcXML, -1)
+	for _, match := range matches {
+		xmlRegex := regexp.MustCompile(`(<\s*\/?[\w-:.]+(\s+[^>]*?)?[\s\/]*>)`)
 		templateText := xmlRegex.ReplaceAllString(match, "")
 		srcXML = strings.ReplaceAll(srcXML, match, templateText)
 	}
