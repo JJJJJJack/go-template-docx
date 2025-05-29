@@ -44,7 +44,7 @@ func applyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]mediaRel, er
 	documentXML = []byte(patchXML(string(documentXML)))
 
 	tmpl, err := template.New("report-template").
-		Delims("[[", "]]").
+		// Delims("[[", "]]").
 		Funcs(template.FuncMap{
 			"toImage": toImage,
 		}).
