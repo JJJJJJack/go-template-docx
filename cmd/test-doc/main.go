@@ -41,12 +41,14 @@ func main() {
 				Text:        "Lorem Ipsum",
 				Description: "Lorem Ipsum descript",
 				Icon:        "ap.png",
+				A:           "test2",
 			},
 			{
 				Title:       "Prova3",
 				Text:        "Lorem Ipsum",
 				Description: "Lorem Ipsum descript",
 				Icon:        "windows.png",
+				A:           "test3",
 			},
 		},
 	}
