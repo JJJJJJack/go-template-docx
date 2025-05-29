@@ -1,4 +1,5 @@
 *.docx
 .DS_Store
-output
 .~lock*
+output
+report-template
