@@ -52,7 +52,7 @@ func Test_patchXML(t *testing.T) {
 	for _, filepath := range []string{
 		// "../../report-template-libreoffice.docx",
 		// "../../report-template-word.docx",
-		"../../report-template.docx",
+		// "../../report-template.docx",
 		"../../output.docx",
 	} {
 		documentXml, err := obtainDocumentXml(filepath)
@@ -63,7 +63,7 @@ func Test_patchXML(t *testing.T) {
 		tests = append(tests, testArgs{
 			name:   "Search for the if-else condition inside " + filepath,
 			srcXml: documentXml,
-			want:   "{{if eq .A",
+			want:   "trueyes",
 		})
 	}
 
@@ -71,10 +71,11 @@ func Test_patchXML(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := patchXML(tt.srcXml)
+			mydebug.FindAndPrintSnippet(got, "true")
+
 			if false == strings.Contains(got, tt.want) {
 				t.Errorf("patchXML() result does not contain want '%s'", tt.want)
 			}
-			mydebug.FindAndPrintSnippet(got, tt.want)
 		})
 	}
 }

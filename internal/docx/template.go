@@ -11,37 +11,17 @@ import (
 )
 
 func patchXML(srcXML string) string {
-	// htmlDecoded := html.UnescapeString(srcXML)
+	// Fix separated {{
+	re := regexp.MustCompile(`\{([\s\S]*?)\{`)
+	srcXML = re.ReplaceAllString(srcXML, "{{")
 
-	// Fix separated [[
-	re := regexp.MustCompile(`\[([\s\S]*?)\[`)
-	srcXML = re.ReplaceAllString(srcXML, "[[")
-
-	// Fix separated ]]
-	re = regexp.MustCompile(`\]([\s\S]*?)\]`)
-	srcXML = re.ReplaceAllString(srcXML, "]]")
+	// Fix separated }}
+	re = regexp.MustCompile(`\}([\s\S]*?)\}`)
+	srcXML = re.ReplaceAllString(srcXML, "}}")
 
 	// Remove unecessary XML tags
-	re = regexp.MustCompile(`\[\[[\s\S]*?\]\]`)
+	re = regexp.MustCompile(`\{\{[\s\S]*?\}\}`)
 	matches := re.FindAllString(srcXML, -1)
-	for _, match := range matches {
-		xmlRegex := regexp.MustCompile(`(<\s*\/?[\w-:.]+(\s+[^>]*?)?[\s\/]*>)`)
-		templateText := xmlRegex.ReplaceAllString(match, "")
-		srcXML = strings.ReplaceAll(srcXML, match, templateText)
-	}
-
-	// Remove unecessary XML tags between [[if ...]] and [[else]]
-	re = regexp.MustCompile(`\[\[if\s+.*?\]\][\s\S]*?\[\[else\]\]`)
-	matches = re.FindAllString(srcXML, -1)
-	for _, match := range matches {
-		xmlRegex := regexp.MustCompile(`(<\s*\/?[\w-:.]+(\s+[^>]*?)?[\s\/]*>)`)
-		templateText := xmlRegex.ReplaceAllString(match, "")
-		srcXML = strings.ReplaceAll(srcXML, match, templateText)
-	}
-
-	// Remove unecessary XML tags between [[else]] and [[end]]
-	re = regexp.MustCompile(`\[\[else\]\][\s\S]*?\[\[end\]\]`)
-	matches = re.FindAllString(srcXML, -1)
 	for _, match := range matches {
 		xmlRegex := regexp.MustCompile(`(<\s*\/?[\w-:.]+(\s+[^>]*?)?[\s\/]*>)`)
 		templateText := xmlRegex.ReplaceAllString(match, "")
@@ -64,7 +44,6 @@ func applyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]mediaRel, er
 	documentXML = []byte(patchXML(string(documentXML)))
 
 	tmpl, err := template.New("report-template").
-		// Delims("[[", "]]").
 		Funcs(template.FuncMap{
 			"toImage": toImage,
 		}).
@@ -74,7 +53,10 @@ func applyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]mediaRel, er
 	}
 
 	appliedTemplate := bytes.Buffer{}
-	tmpl.Execute(&appliedTemplate, data)
+	err = tmpl.Execute(&appliedTemplate, data)
+	if err != nil {
+		return nil, fmt.Errorf("unable to execute template in file %s: %w", f.Name, err)
+	}
 
 	output, media, err := applyImages(appliedTemplate.String())
 	if err != nil {

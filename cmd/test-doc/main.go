@@ -11,12 +11,14 @@ type Row struct {
 	Text        string
 	Description string
 	Icon        string
-	A           string
+	A           bool
 }
 
 type Data struct {
 	Title string
 	Table []Row
+	A     string
+	B     string
 }
 
 func readFile(filename string) []byte {
@@ -34,23 +36,25 @@ func main() {
 				Text:        "Lorem Ipsum",
 				Description: "Lorem Ipsum descript",
 				Icon:        "generic.png",
-				A:           "test",
+				A:           true,
 			},
 			{
 				Title:       "Prova2",
 				Text:        "Lorem Ipsum",
 				Description: "Lorem Ipsum descript",
 				Icon:        "ap.png",
-				A:           "test2",
+				A:           false,
 			},
 			{
 				Title:       "Prova3",
 				Text:        "Lorem Ipsum",
 				Description: "Lorem Ipsum descript",
 				Icon:        "windows.png",
-				A:           "test3",
+				A:           true,
 			},
 		},
+		A: "test",
+		B: "laa",
 	}
 
 	template := docx.NewTemplate(templateFile)
