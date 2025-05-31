@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"regexp"
+	"slices"
 )
 
 type Template struct {
@@ -73,50 +75,26 @@ func (t *Template) Apply(data any) error {
 		break
 	}
 
-	toApplyTemplate := []string{
-		"word/document.xml",
-		"word/header.xml",
-		"word/footer.xml",
-	}
-
 	toSkip := []string{
 		relFile,
 		ctFile,
 	}
-
 	for _, f := range r.File {
-		toEdit := false
-		for _, toApplyTemplateFile := range toApplyTemplate {
-			// I don't know how many headers there are, so I use a regex,
-			// also the "toApplyTemplate" array had a "word/header.xml"
-			// which I didn't have in my docx/word folder
-			// matched, err := regexp.Match("word/header[0-9].xml", []byte(f.Name))
-			// if err != nil {
-			// 	return fmt.Errorf("regexp.Match error: %w", err)
-			// }
-
-			if f.Name != toApplyTemplateFile {
-				continue
-			}
-			toEdit = true
+		if slices.Contains(toSkip, f.Name) {
+			continue
 		}
 
-		if !toEdit {
-			skipFile := false
-			for _, skip := range toSkip {
-				if f.Name == skip {
-					skipFile = true
-					break
-				}
-			}
+		// I don't know how many headers/footers there are, so I use a regex
+		matched, err := regexp.Match("word/(header|footer|document)[0-9]*?.xml", []byte(f.Name))
+		if err != nil {
+			return fmt.Errorf("regexp.Match error: %w", err)
+		}
 
-			if !skipFile {
-				err = copyOriginalFile(f, zipWriter)
-				if err != nil {
-					return fmt.Errorf("unable to copy original file %s: %w", f.Name, err)
-				}
+		if !matched {
+			err = copyOriginalFile(f, zipWriter)
+			if err != nil {
+				return fmt.Errorf("unable to copy original file %s: %w", f.Name, err)
 			}
-
 			continue
 		}
 
