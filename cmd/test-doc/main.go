@@ -15,10 +15,11 @@ type Row struct {
 }
 
 type Data struct {
-	Title string
-	Table []Row
-	A     string
-	B     string
+	Title       string
+	Description string
+	Table       []Row
+	A           string
+	B           string
 }
 
 func readFile(filename string) []byte {
@@ -29,7 +30,8 @@ func readFile(filename string) []byte {
 func main() {
 	templateFile := "report-template.docx"
 	data := Data{
-		Title: "Asset Report",
+		Title:       "Asset Report",
+		Description: "Asset Report Description",
 		Table: []Row{
 			{
 				Title:       "Prova1",
