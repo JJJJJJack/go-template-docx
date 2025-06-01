@@ -15,6 +15,12 @@ type Row struct {
 }
 
 type Data struct {
+	Chart struct {
+		Category1 string
+		Category2 string
+		Category3 string
+		Category4 string
+	}
 	Title       string
 	Description string
 	Table       []Row
@@ -57,6 +63,17 @@ func main() {
 		},
 		A: "test",
 		B: "laa",
+		Chart: struct {
+			Category1 string
+			Category2 string
+			Category3 string
+			Category4 string
+		}{
+			Category1: "Category 1",
+			Category2: "Category 2",
+			Category3: "Category 3",
+			Category4: "Category 4",
+		},
 	}
 
 	template := docx.NewTemplate(templateFile)

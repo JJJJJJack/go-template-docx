@@ -84,8 +84,20 @@ func (t *Template) Apply(data any) error {
 			continue
 		}
 
+		matchedXlsx, err := regexp.Match(`word/embeddings/Microsoft_Excel_Worksheet\d*?.xlsx`, []byte(f.Name))
+		if err != nil {
+			return fmt.Errorf("regexp.Match error: %w", err)
+		}
+		if matchedXlsx {
+			err = WriteXLSXIntoZip(zipWriter, f, data)
+			if err != nil {
+				return fmt.Errorf("unable to write XLSX file %s: %w", f.Name, err)
+			}
+			continue
+		}
+
 		// I don't know how many headers/footers there are, so I use a regex
-		matched, err := regexp.Match("word/(header|footer|document)[0-9]*?.xml", []byte(f.Name))
+		matched, err := regexp.Match(`word/((charts/chart)|(header|footer|document))\d*?.xml`, []byte(f.Name))
 		if err != nil {
 			return fmt.Errorf("regexp.Match error: %w", err)
 		}
