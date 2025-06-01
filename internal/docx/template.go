@@ -12,11 +12,11 @@ import (
 
 func patchXML(srcXML string) string {
 	// Fix separated {{
-	re := regexp.MustCompile(`\{([\s\S]*?)\{`)
+	re := regexp.MustCompile(`\{([^\}]*?)\{`)
 	srcXML = re.ReplaceAllString(srcXML, "{{")
 
 	// Fix separated }}
-	re = regexp.MustCompile(`\}([\s\S]*?)\}`)
+	re = regexp.MustCompile(`\}([^\{]*?)\}`)
 	srcXML = re.ReplaceAllString(srcXML, "}}")
 
 	// Remove unecessary XML tags
