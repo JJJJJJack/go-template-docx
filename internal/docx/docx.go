@@ -37,7 +37,7 @@ func (t *Template) Media(filename string, data []byte) {
 	})
 }
 
-func (t *Template) Apply(data any) error {
+func (t *Template) Apply(templateValues any) error {
 	zipWriter := zip.NewWriter(&t.output)
 
 	r, err := zip.OpenReader(t.templateFile)
@@ -89,7 +89,7 @@ func (t *Template) Apply(data any) error {
 			return fmt.Errorf("regexp.Match error: %w", err)
 		}
 		if matchedXlsx {
-			err = WriteXLSXIntoZip(zipWriter, f, data)
+			err = WriteXLSXIntoZip(zipWriter, f, templateValues)
 			if err != nil {
 				return fmt.Errorf("unable to write XLSX file %s: %w", f.Name, err)
 			}
@@ -110,7 +110,7 @@ func (t *Template) Apply(data any) error {
 			continue
 		}
 
-		media, err := applyTemplate(f, zipWriter, data)
+		media, err := applyTemplate(f, zipWriter, templateValues)
 		if err != nil {
 			return fmt.Errorf("unable to apply template to file %s: %w", f.Name, err)
 		}

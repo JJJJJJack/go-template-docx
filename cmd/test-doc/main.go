@@ -6,6 +6,11 @@ import (
 	"testdocx/internal/docx"
 )
 
+type ExcelRecord struct {
+	Label string
+	Value any
+}
+
 type Row struct {
 	Title       string
 	Text        string
@@ -15,12 +20,7 @@ type Row struct {
 }
 
 type Data struct {
-	Chart struct {
-		Category1 string
-		Category2 string
-		Category3 string
-		Category4 string
-	}
+	Charts      []ExcelRecord
 	Title       string
 	Description string
 	Table       []Row
@@ -35,7 +35,7 @@ func readFile(filename string) []byte {
 
 func main() {
 	templateFile := "report-template.docx"
-	data := Data{
+	templateValues := Data{
 		Title:       "Asset Report",
 		Description: "Asset Report Description",
 		Table: []Row{
@@ -63,16 +63,11 @@ func main() {
 		},
 		A: "test",
 		B: "laa",
-		Chart: struct {
-			Category1 string
-			Category2 string
-			Category3 string
-			Category4 string
-		}{
-			Category1: "Category 1",
-			Category2: "Category 2",
-			Category3: "Category 3",
-			Category4: "Category 4",
+		Charts: []ExcelRecord{
+			{Label: "Cat1", Value: 111},
+			{Label: "Cat2", Value: 222},
+			{Label: "Cat3", Value: 333},
+			{Label: "Cat4", Value: 444},
 		},
 	}
 
@@ -81,7 +76,7 @@ func main() {
 	template.Media("ap.png", readFile("ap.png"))
 	template.Media("windows.png", readFile("windows.png"))
 
-	err := template.Apply(data)
+	err := template.Apply(templateValues)
 	if err != nil {
 		fmt.Println("Error applying template:", err)
 	}
