@@ -19,6 +19,13 @@ type Row struct {
 	A           bool
 }
 
+type Pie struct {
+	CriticalSum uint
+	HighSum     uint
+	MediumSum   uint
+	LowSum      uint
+}
+
 type Data struct {
 	Charts      []ExcelRecord
 	Title       string
@@ -26,6 +33,7 @@ type Data struct {
 	Table       []Row
 	A           string
 	B           string
+	Pie         Pie
 }
 
 func readFile(filename string) []byte {
@@ -68,6 +76,12 @@ func main() {
 			{Label: "Cat2", Value: 222},
 			{Label: "Cat3", Value: 333},
 			{Label: "Cat4", Value: 444},
+		},
+		Pie: Pie{
+			CriticalSum: 10,
+			HighSum:     20,
+			MediumSum:   30,
+			LowSum:      40,
 		},
 	}
 
