@@ -2,7 +2,9 @@ package docx
 
 import (
 	"archive/zip"
+	"fmt"
 	"io"
+	"regexp"
 )
 
 func copyOriginalFile(f *zip.File, zipWriter *zip.Writer) error {
@@ -75,4 +77,14 @@ func replaceFileContent(f *zip.File, zipWriter *zip.Writer, content []byte) erro
 	}
 
 	return nil
+}
+
+// now only works with a single submatch
+func ExtractChartName(path string) (string, error) {
+	re := regexp.MustCompile(`(chart\d+)\.xml`)
+	matches := re.FindStringSubmatch(path)
+	if len(matches) < 2 {
+		return "", fmt.Errorf("no chart name found")
+	}
+	return matches[1], nil
 }

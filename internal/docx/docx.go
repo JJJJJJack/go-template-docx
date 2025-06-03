@@ -4,11 +4,11 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"regexp"
 	"slices"
+	"strings"
 )
 
 type Template struct {
@@ -39,8 +39,6 @@ func (t *Template) Media(filename string, data []byte) {
 }
 
 func (t *Template) Apply(templateValues any) error {
-	sharedStringsNumbers := make(map[int]string)
-
 	zipWriter := zip.NewWriter(&t.output)
 
 	r, err := zip.OpenReader(t.templateFile)
@@ -82,22 +80,47 @@ func (t *Template) Apply(templateValues any) error {
 		relFile,
 		ctFile,
 	}
+
+	chartRelToTargetXlsx := make(map[string]string)
+	chartsRelMatcher := regexp.MustCompile(`word/charts/_rels/chart\d*?\.xml.rels`)
 	chartsMatcher := regexp.MustCompile(`word/charts/chart\d*?\.xml`)
-	xlsxMatcher := regexp.MustCompile(`word/embeddings/Microsoft_Excel_Worksheet\d*?\.xlsx`)
+	xlsxMatcher := regexp.MustCompile(`/embeddings/Microsoft_Excel_Worksheet\d*?\.xlsx`)
 	headerFooterDocumentMatcher := regexp.MustCompile(`word/(header|footer|document)\d*?\.xml`)
 	for _, f := range r.File {
 		if slices.Contains(toSkip, f.Name) {
 			continue
 		}
 
-		matchedCharts := chartsMatcher.MatchString(f.Name)
-		if matchedCharts {
+		matchedChartsRel := chartsRelMatcher.MatchString(f.Name)
+		if matchedChartsRel {
+			fileContent, err := readFileContent(f)
+			if err != nil {
+				return fmt.Errorf("unable to read chart rel file %s: %w", f.Name, err)
+			}
+
+			chartsRelationships, _ := parseRelationship(fileContent)
+			for _, relationship := range chartsRelationships.Relationships {
+				if !xlsxMatcher.MatchString(relationship.Target) {
+					continue
+				}
+
+				formattedTarget := strings.Replace(relationship.Target, "../", "word/", 1)
+				chartNumber, err := ExtractChartName(f.Name)
+				if err != nil {
+					return fmt.Errorf("unable to extract chart name from file %s: %w", f.Name, err)
+				}
+				chartRelToTargetXlsx[chartNumber] = formattedTarget
+			}
+		}
+
+		matchedChart := chartsMatcher.MatchString(f.Name)
+		if matchedChart {
 			continue
 		}
 
 		matchedXlsx := xlsxMatcher.MatchString(f.Name)
 		if matchedXlsx {
-			sharedStringsNumbers, err = WriteXLSXIntoZip(f, zipWriter, templateValues)
+			err := WriteXLSXIntoZip(f, zipWriter, templateValues)
 			if err != nil {
 				return fmt.Errorf("unable to write XLSX file %s: %w", f.Name, err)
 			}
@@ -113,7 +136,6 @@ func (t *Template) Apply(templateValues any) error {
 			}
 			continue
 		}
-		_ = sharedStringsNumbers
 
 		media, err := applyTemplate(f, zipWriter, templateValues)
 		if err != nil {
@@ -129,23 +151,23 @@ func (t *Template) Apply(templateValues any) error {
 			continue
 		}
 
-		fileReader, err := f.Open()
-		if err != nil {
-			return fmt.Errorf("unable to open chart file %s: %w", f.Name, err)
-		}
-
-		fileContent, err := io.ReadAll(fileReader)
+		fileContent, err := readFileContent(f)
 		if err != nil {
 			return fmt.Errorf("unable to read chart file %s: %w", f.Name, err)
 		}
-		fileReader.Close()
 
 		fileContent, err = ApplyTemplateToChart(f, templateValues, fileContent)
 		if err != nil {
 			return fmt.Errorf("unable to apply template to file %s: %w", f.Name, err)
 		}
 
-		fileContent, err = ReplacePreviewZerosWithXlsxChartValues(fileContent, sharedStringsNumbers)
+		chartFileNumber, err := ExtractChartName(f.Name)
+		if err != nil {
+			return fmt.Errorf("unable to extract chart name from file %s: %w", f.Name, err)
+		}
+
+		xlsxFileTarget := chartRelToTargetXlsx[chartFileNumber]
+		fileContent, err = UpdateDocxChartWithXlsxChartValues(fileContent, XlsxFiles[xlsxFileTarget].ChartNumbers)
 		if err != nil {
 			return fmt.Errorf("unable to replace preview zeros in chart file %s: %w", f.Name, err)
 		}

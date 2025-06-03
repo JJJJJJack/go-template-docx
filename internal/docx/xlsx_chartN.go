@@ -9,15 +9,15 @@ import (
 )
 
 // TODO: switch to xml parsing
-func ReplaceSharedStringIndicesWithValues(fileContent []byte, values map[int]string) ([]byte, error) {
+func ReplaceSharedStringIndicesWithValues(fileContent []byte, values map[int]string) ([]byte, []string, error) {
 	re := regexp.MustCompile(`<c[^>]*t="s"[^>]*>.*?<v>(\d+)</v>.*?</c>`)
 	matches := re.FindAllStringSubmatch(string(fileContent), -1)
 
+	valuesOrderedByAppearance := []string{}
 	for _, match := range matches {
-
 		n, err := strconv.Atoi(match[1])
 		if err != nil {
-			return nil, fmt.Errorf("unable to convert index %s to int: %w", match[1], err)
+			return nil, nil, fmt.Errorf("unable to convert index %s to int: %w", match[1], err)
 		}
 
 		if value, ok := values[n]; ok {
@@ -29,8 +29,10 @@ func ReplaceSharedStringIndicesWithValues(fileContent []byte, values map[int]str
 			replace := strings.Replace(removedRefToSharedString, oldV, newV, 1)
 
 			fileContent = bytes.Replace(fileContent, []byte(match[0]), []byte(replace), 1)
+
+			valuesOrderedByAppearance = append(valuesOrderedByAppearance, value)
 		}
 	}
 
-	return fileContent, nil
+	return fileContent, valuesOrderedByAppearance, nil
 }

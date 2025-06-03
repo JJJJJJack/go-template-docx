@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"io"
 	"regexp"
 	"strings"
 	"text/template"
@@ -32,12 +31,7 @@ func patchXML(srcXML string) string {
 }
 
 func applyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]mediaRel, error) {
-	documentFile, err := f.Open()
-	if err != nil {
-		return nil, fmt.Errorf("unable to open document file %s: %w", f.Name, err)
-	}
-
-	documentXML, err := io.ReadAll(documentFile)
+	documentXML, err := readFileContent(f)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read document file %s: %w", f.Name, err)
 	}

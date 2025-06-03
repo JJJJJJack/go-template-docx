@@ -5,10 +5,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
-	"maps"
 	"regexp"
-	"slices"
-	"sort"
 	"text/template"
 )
 
@@ -53,38 +50,8 @@ type ChartSpace struct {
 	Chart Chart `xml:"chart"`
 }
 
-func ReplacePreviewZerosWithXlsxChartValues(fileContent []byte, values map[int]string) ([]byte, error) {
-	/* broken code, not used, but optimally will be used to replace bad regex */
-	// var doc ChartSpace
-	// err := xml.Unmarshal(fileContent, &doc)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("unable to unmarshal XML: %w", err)
-	// }
-
-	indexes := slices.Collect(maps.Keys(values))
-	sort.Ints(indexes)
-
-	// for _, ser := range doc.Chart.PlotArea.BarChart.Series {
-	// 	for i, pt := range ser.Val.NumRef.NumCache.Pts {
-	// 		if i >= len(vals) {
-	// 			continue
-	// 		}
-	// 		pt.V.Value = vals[i]
-	// 		ser.Val.NumRef.NumCache.Pts[i] = pt
-	// 	}
-	// }
-
-	// fileContent, err = xml.Marshal(doc)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("unable to marshal XML: %w", err)
-	// }
-
-	// regexp.Compile(`</c:pt></c:strCache></c:strRef></c:cat><c:val><c:numRef><c:f>(.*?)`)
-
-	if len(indexes) == 0 {
-		return fileContent, nil
-	}
-
+// TODO: parse and unmarshal xml instead of using regex
+func UpdateDocxChartWithXlsxChartValues(fileContent []byte, values []string) ([]byte, error) {
 	re := regexp.MustCompile(`<c:val>.*?<c:v>(.*?)</c:v>.*?</c:val>`)
 	matches := re.FindAllSubmatch(fileContent, -1)
 
@@ -92,8 +59,8 @@ func ReplacePreviewZerosWithXlsxChartValues(fileContent []byte, values map[int]s
 		return fileContent, nil
 	}
 
-	for _, index := range indexes {
-		fileContent = bytes.Replace(fileContent, []byte("<c:v>0</c:v>"), []byte(fmt.Sprintf("<c:v>%s</c:v>", values[index])), 1)
+	for _, value := range values {
+		fileContent = bytes.Replace(fileContent, []byte("<c:v>0</c:v>"), []byte(fmt.Sprintf("<c:v>%s</c:v>", value)), 1)
 	}
 
 	return fileContent, nil

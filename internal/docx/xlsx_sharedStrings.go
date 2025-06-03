@@ -7,7 +7,7 @@ import (
 )
 
 // TODO: switch to xml parsing
-func GetSharedStringsIndexValueMap(fileContent []byte) ([]byte, map[int]string) {
+func GetReferencedSharedStringsByIndexAndCleanup(fileContent []byte) ([]byte, map[int]string) {
 	values := make(map[int]string)
 
 	re := regexp.MustCompile(`<si(?:\s[^>]*)?><t(?:\s[^>]*)?>(.*?)</t></si>`)
