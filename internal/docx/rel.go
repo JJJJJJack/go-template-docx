@@ -14,12 +14,12 @@ type relationshipDetail struct {
 	Id     string `xml:"Id,attr"`
 }
 
-type relationship struct {
+type Relationship struct {
 	XMLName       xml.Name             `xml:"http://schemas.openxmlformats.org/package/2006/relationships Relationships"`
 	Relationships []relationshipDetail `xml:"Relationship"`
 }
 
-func (r *relationship) addMediaToRels(media []mediaRel) {
+func (r *Relationship) AddMediaToRels(media []MediaRel) {
 	for _, m := range media {
 		switch m.Type {
 		case ImageMediaType:
@@ -32,7 +32,7 @@ func (r *relationship) addMediaToRels(media []mediaRel) {
 	}
 }
 
-func (r *relationship) addRelationship(relType, target, id string) {
+func (r *Relationship) addRelationship(relType, target, id string) {
 	newRel := relationshipDetail{
 		Type:   relType,
 		Target: target,
@@ -41,7 +41,7 @@ func (r *relationship) addRelationship(relType, target, id string) {
 	r.Relationships = append(r.Relationships, newRel)
 }
 
-func (r *relationship) toXML() (string, error) {
+func (r *Relationship) ToXML() (string, error) {
 	output, err := xml.MarshalIndent(r, "", "  ")
 	if err != nil {
 		return "", err
@@ -49,8 +49,8 @@ func (r *relationship) toXML() (string, error) {
 	return xml.Header + string(output), nil
 }
 
-func parseRelationship(data []byte) (*relationship, error) {
-	var relationships relationship
+func ParseRelationship(data []byte) (*Relationship, error) {
+	var relationships Relationship
 	err := xml.Unmarshal(data, &relationships)
 	if err != nil {
 		return nil, err

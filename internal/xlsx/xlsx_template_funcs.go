@@ -1,8 +1,6 @@
-package docx
+package xlsx
 
-import (
-	"fmt"
-)
+import "fmt"
 
 func toNumberCell(v any) (interface{}, error) {
 	switch v := v.(type) {
@@ -13,6 +11,5 @@ func toNumberCell(v any) (interface{}, error) {
 		return fmt.Sprintf("[[NUMBER:%v]]", v), nil
 	}
 
-	fmt.Printf("Type %T not implemented in toNumberCell", v)
 	return nil, fmt.Errorf("type %T not implemented in toNumberCell", v)
 }

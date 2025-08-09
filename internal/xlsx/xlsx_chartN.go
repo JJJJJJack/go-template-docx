@@ -1,4 +1,4 @@
-package docx
+package xlsx
 
 import (
 	"archive/zip"
@@ -6,7 +6,11 @@ import (
 	"encoding/xml"
 	"fmt"
 	"regexp"
+	"strconv"
+	"strings"
 	"text/template"
+
+	"github.com/JJJJJJack/go-template-docx/internal/docx"
 )
 
 type V struct {
@@ -51,7 +55,7 @@ type ChartSpace struct {
 }
 
 // TODO: parse and unmarshal xml instead of using regex
-func UpdateDocxChartWithXlsxChartValues(fileContent []byte, values []string) ([]byte, error) {
+func UpdateChart(fileContent []byte, values []string) ([]byte, error) {
 	re := regexp.MustCompile(`<c:val>.*?<c:v>(.*?)</c:v>.*?</c:val>`)
 	matches := re.FindAllSubmatch(fileContent, -1)
 
@@ -68,7 +72,7 @@ func UpdateDocxChartWithXlsxChartValues(fileContent []byte, values []string) ([]
 
 func ApplyTemplateToChart(f *zip.File, templateValues any, fileContent []byte) ([]byte, error) {
 	tmpl, err := template.New(f.Name).
-		Parse(patchXML(string(fileContent)))
+		Parse(docx.PatchXML(string(fileContent)))
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse template: %w", err)
 	}
@@ -79,4 +83,33 @@ func ApplyTemplateToChart(f *zip.File, templateValues any, fileContent []byte) (
 	}
 
 	return buf.Bytes(), nil
+}
+
+// TODO: switch to xml parsing
+func ReplaceSharedStringIndicesWithValues(fileContent []byte, values map[int]string) ([]byte, []string, error) {
+	re := regexp.MustCompile(`<c[^>]*t="s"[^>]*>.*?<v>(\d+)</v>.*?</c>`)
+	matches := re.FindAllStringSubmatch(string(fileContent), -1)
+
+	valuesOrderedByAppearance := []string{}
+	for _, match := range matches {
+		n, err := strconv.Atoi(match[1])
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to convert index %s to int: %w", match[1], err)
+		}
+
+		if value, ok := values[n]; ok {
+			removedRefToSharedString := strings.Replace(match[0], `t="s"`, "", 1)
+
+			oldV := fmt.Sprintf("<v>%d</v>", n)
+			newV := fmt.Sprintf("<v>%s</v>", value)
+
+			replace := strings.Replace(removedRefToSharedString, oldV, newV, 1)
+
+			fileContent = bytes.Replace(fileContent, []byte(match[0]), []byte(replace), 1)
+
+			valuesOrderedByAppearance = append(valuesOrderedByAppearance, value)
+		}
+	}
+
+	return fileContent, valuesOrderedByAppearance, nil
 }

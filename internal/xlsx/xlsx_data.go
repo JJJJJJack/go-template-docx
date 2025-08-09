@@ -1,4 +1,4 @@
-package docx
+package xlsx
 
 type XlsxData struct {
 	ChartNumbers []string

@@ -1,4 +1,4 @@
-package docx
+package xlsx
 
 import (
 	"archive/zip"
@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"regexp"
 	"text/template"
+
+	"github.com/JJJJJJack/go-template-docx/internal/docx"
+	"github.com/JJJJJJack/go-template-docx/internal/utils"
 )
 
 func applyTemplateToCells(f *zip.File, templateValues any, fileContent []byte) ([]byte, error) {
@@ -13,7 +16,7 @@ func applyTemplateToCells(f *zip.File, templateValues any, fileContent []byte) (
 		Funcs(template.FuncMap{
 			"toNumberCell": toNumberCell,
 		}).
-		Parse(patchXML(string(fileContent)))
+		Parse(docx.PatchXML(string(fileContent)))
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse template: %w", err)
 	}
@@ -32,7 +35,7 @@ func ModifyXLSXInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]by
 	var sharedStringsNumbers map[int]string
 
 	// Read XLSX zip into memory
-	xlsxData, err := readFileContent(xlsxFile)
+	xlsxData, err := utils.ReadZipFileContent(xlsxFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read embedded XLSX file: %w", err)
 	}
@@ -56,7 +59,7 @@ func ModifyXLSXInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]by
 			continue
 		}
 
-		fileContent, err := readFileContent(f)
+		fileContent, err := utils.ReadZipFileContent(f)
 		if err != nil {
 			return nil, fmt.Errorf("error reading file %s: %w", f.Name, err)
 		}
@@ -88,7 +91,7 @@ func ModifyXLSXInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]by
 			continue
 		}
 
-		fileContent, err := readFileContent(f)
+		fileContent, err := utils.ReadZipFileContent(f)
 		if err != nil {
 			return nil, fmt.Errorf("error reading file %s: %w", f.Name, err)
 		}

@@ -63,10 +63,11 @@ func generateSequentialReferenceID() string {
 	return fmt.Sprintf("rId%d", counterID)
 }
 
-func applyImages(srcXML string) (string, []mediaRel, error) {
-	mediaList := []mediaRel{}
+func applyImages(srcXML string) (string, []MediaRel, error) {
+	mediaList := []MediaRel{}
 
 	re := regexp.MustCompile(`<w:[A-Za-z]?>\[\[IMAGE:.*?\]\]</w:[A-Za-z]>`)
+	imagePlaceholderRE := regexp.MustCompile(`\[\[IMAGE:.*?\]\]`)
 	xmlBlocks := re.FindAllString(srcXML, -1)
 	for _, xmlBlock := range xmlBlocks {
 		imageTemplate, err := template.New("image-template").Parse(imageTemplate)
@@ -74,8 +75,7 @@ func applyImages(srcXML string) (string, []mediaRel, error) {
 			return srcXML, mediaList, err
 		}
 
-		imageRE := regexp.MustCompile(`\[\[IMAGE:.*?\]\]`)
-		imageDirections := imageRE.FindAllString(xmlBlock, -1)
+		imageDirections := imagePlaceholderRE.FindAllString(xmlBlock, -1)
 		if len(imageDirections) < 1 {
 			continue
 		}
@@ -92,7 +92,7 @@ func applyImages(srcXML string) (string, []mediaRel, error) {
 			RefID: refID,
 		})
 
-		mediaList = append(mediaList, mediaRel{
+		mediaList = append(mediaList, MediaRel{
 			Type:   ImageMediaType,
 			RefID:  refID,
 			Source: path.Join("media", filename),

@@ -1,4 +1,4 @@
-package docx
+package utils
 
 import (
 	"archive/zip"
@@ -7,7 +7,7 @@ import (
 	"regexp"
 )
 
-func copyOriginalFile(f *zip.File, zipWriter *zip.Writer) error {
+func CopyOriginalFile(f *zip.File, zipWriter *zip.Writer) error {
 	fileInZip, err := f.Open()
 	if err != nil {
 		return err
@@ -29,7 +29,7 @@ func copyOriginalFile(f *zip.File, zipWriter *zip.Writer) error {
 	return nil
 }
 
-func readFileContent(f *zip.File) ([]byte, error) {
+func ReadZipFileContent(f *zip.File) ([]byte, error) {
 	fileInZip, err := f.Open()
 	if err != nil {
 		return nil, err
@@ -39,7 +39,7 @@ func readFileContent(f *zip.File) ([]byte, error) {
 	return io.ReadAll(fileInZip)
 }
 
-func writeFile(filename string, zipWriter *zip.Writer, content []byte) error {
+func WriteFile(filename string, zipWriter *zip.Writer, content []byte) error {
 	newFile, err := zipWriter.CreateHeader(&zip.FileHeader{
 		Name:   filename,
 		Method: zip.Deflate,
@@ -56,7 +56,7 @@ func writeFile(filename string, zipWriter *zip.Writer, content []byte) error {
 	return nil
 }
 
-func replaceFileContent(f *zip.File, zipWriter *zip.Writer, content []byte) error {
+func ReplaceFileContent(f *zip.File, zipWriter *zip.Writer, content []byte) error {
 	fileInZip, err := f.Open()
 	if err != nil {
 		return err
@@ -79,7 +79,7 @@ func replaceFileContent(f *zip.File, zipWriter *zip.Writer, content []byte) erro
 	return nil
 }
 
-// now only works with a single submatch
+// ExtractChartName now only works with a single submatch
 func ExtractChartName(path string) (string, error) {
 	re := regexp.MustCompile(`(chart\d+)\.xml`)
 	matches := re.FindStringSubmatch(path)

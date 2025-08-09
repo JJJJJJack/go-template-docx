@@ -7,9 +7,11 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
+
+	"github.com/JJJJJJack/go-template-docx/internal/utils"
 )
 
-func patchXML(srcXML string) string {
+func PatchXML(srcXML string) string {
 	// Fix separated {{
 	re := regexp.MustCompile(`\{([^\}]*?)\{`)
 	srcXML = re.ReplaceAllString(srcXML, "{{")
@@ -30,12 +32,12 @@ func patchXML(srcXML string) string {
 	return srcXML
 }
 
-func applyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]mediaRel, error) {
-	documentXML, err := readFileContent(f)
+func ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]MediaRel, error) {
+	documentXML, err := utils.ReadZipFileContent(f)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read document file %s: %w", f.Name, err)
 	}
-	documentXML = []byte(patchXML(string(documentXML)))
+	documentXML = []byte(PatchXML(string(documentXML)))
 
 	tmpl, err := template.New("report-template").
 		Funcs(template.FuncMap{

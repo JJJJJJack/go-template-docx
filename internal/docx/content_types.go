@@ -20,7 +20,7 @@ type contentTypes struct {
 	Overrides []overrideContent `xml:"Override"`
 }
 
-func parseContentTypes(data []byte) (*contentTypes, error) {
+func ParseContentTypes(data []byte) (*contentTypes, error) {
 	var ct contentTypes
 	err := xml.Unmarshal(data, &ct)
 	if err != nil {
@@ -29,7 +29,7 @@ func parseContentTypes(data []byte) (*contentTypes, error) {
 	return &ct, nil
 }
 
-func (ct *contentTypes) ensureImageDefaults(ext string, mime string) {
+func (ct *contentTypes) EnsureImageDefaults(ext string, mime string) {
 	for _, d := range ct.Defaults {
 		if d.Extension == ext {
 			return
@@ -41,10 +41,11 @@ func (ct *contentTypes) ensureImageDefaults(ext string, mime string) {
 	})
 }
 
-func (ct *contentTypes) toXML() (string, error) {
+func (ct *contentTypes) ToXML() (string, error) {
 	output, err := xml.MarshalIndent(ct, "", "  ")
 	if err != nil {
 		return "", err
 	}
+
 	return xml.Header + string(output), nil
 }

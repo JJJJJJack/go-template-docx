@@ -4,12 +4,12 @@ const (
 	ImageMediaType = iota + 1
 )
 
-type media struct {
-	filename string
-	data     []byte
+type Media struct {
+	Filename string
+	Data     []byte
 }
 
-type mediaRel struct {
+type MediaRel struct {
 	Type   uint
 	RefID  string
 	Source string
