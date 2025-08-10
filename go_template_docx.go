@@ -284,6 +284,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 }
 
 // Save iterates over filenames and write the output docx for the first non esistent file.
+// If a single filename string is provided, the file gets overwritten.
 // If no filenames are provided, it saves the file with a timestamp or the provided original filename
 // if the docxTemplate object was created with the NewDocxTemplateFromFilename function.
 func (dt *docxTemplate) Save(filenames ...string) error {
@@ -292,7 +293,10 @@ func (dt *docxTemplate) Save(filenames ...string) error {
 		filename = fmt.Sprintf("output_%s.docx", time.Now().Format("20060102150405"))
 	}
 
-	if len(filenames) > 0 {
+	if len(filenames) == 1 {
+		filename = filenames[0]
+	}
+	if len(filenames) > 1 {
 		var err error
 		filename, err = file.FindFirstMissingFile(filenames)
 		if err != nil {
