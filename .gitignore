@@ -4,3 +4,4 @@
 .~lock*
 output*
 report-template*
+*.exe
