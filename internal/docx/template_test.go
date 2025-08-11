@@ -71,7 +71,7 @@ func Test_patchXML(t *testing.T) {
 	// ACTUAL TEST
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := PatchXML(tt.srcXml)
+			got := PatchXml(tt.srcXml)
 			mydebug.FindAndPrintSnippet(got, "true")
 
 			if false == strings.Contains(got, tt.want) {

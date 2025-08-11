@@ -11,25 +11,27 @@ import (
 	"github.com/JJJJJJack/go-template-docx/internal/utils"
 )
 
-func PatchXML(srcXML string) string {
+// PatchXml removes automatically insert content between template expressions
+// (EG: "{{ .Text }}" could have correctors highlights tags separating the expressions tokens).
+func PatchXml(srcXml string) string {
 	// Fix separated {{
 	re := regexp.MustCompile(`\{([^\}]*?)\{`)
-	srcXML = re.ReplaceAllString(srcXML, "{{")
+	srcXml = re.ReplaceAllString(srcXml, "{{")
 
 	// Fix separated }}
 	re = regexp.MustCompile(`\}([^\{]*?)\}`)
-	srcXML = re.ReplaceAllString(srcXML, "}}")
+	srcXml = re.ReplaceAllString(srcXml, "}}")
 
 	// Remove unecessary XML tags
 	re = regexp.MustCompile(`\{\{[\s\S]*?\}\}`)
-	matches := re.FindAllString(srcXML, -1)
+	matches := re.FindAllString(srcXml, -1)
 	for _, match := range matches {
 		xmlRegex := regexp.MustCompile(`(<\s*\/?[\w-:.]+(\s+[^>]*?)?[\s\/]*>)`)
 		templateText := xmlRegex.ReplaceAllString(match, "")
-		srcXML = strings.ReplaceAll(srcXML, match, templateText)
+		srcXml = strings.ReplaceAll(srcXml, match, templateText)
 	}
 
-	return srcXML
+	return srcXml
 }
 
 func ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]MediaRel, error) {
@@ -37,9 +39,9 @@ func ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]MediaRel, er
 	if err != nil {
 		return nil, fmt.Errorf("unable to read document file %s: %w", f.Name, err)
 	}
-	documentXML = []byte(PatchXML(string(documentXML)))
+	documentXML = []byte(PatchXml(string(documentXML)))
 
-	tmpl, err := template.New("report-template").
+	tmpl, err := template.New(f.Name).
 		Funcs(template.FuncMap{
 			"toImage": toImage,
 		}).
@@ -60,11 +62,10 @@ func ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]MediaRel, er
 	}
 	output = postProcessing(output)
 
-	newDocumentXMLFile, _ := zipWriter.CreateHeader(&zip.FileHeader{
-		Name:   f.Name,
-		Method: f.FileHeader.Method,
-	})
-	newDocumentXMLFile.Write([]byte(output))
+	err = utils.RewriteFileIntoZipWriter(f, zipWriter, []byte(output))
+	if err != nil {
+		return nil, fmt.Errorf("unable to rewrite file %s in zip: %w", f.Name, err)
+	}
 
 	return media, nil
 }

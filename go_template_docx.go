@@ -88,94 +88,105 @@ func (dt *docxTemplate) Media(filename string, data []byte) {
 func (dt *docxTemplate) Apply(templateValues any) error {
 	zipWriter := zip.NewWriter(&dt.output)
 
+	zipMap := make(map[string]*zip.File)
+	for _, f := range dt.reader.File {
+		zipMap[f.Name] = f
+	}
+
+	documentRelsFilename := "word/_rels/document.xml.rels"
+	contentTypesFilename := "[Content_Types].xml"
+	toSkip := []string{
+		documentRelsFilename,
+		contentTypesFilename,
+	}
+	chartsMatcher := regexp.MustCompile(`word/charts/chart\d*?\.xml`)
+	headerFooterDocumentMatcher := regexp.MustCompile(`word/(header|footer|document)\d*?\.xml`)
+	xlsxMatcher := regexp.MustCompile(`/embeddings/Microsoft_Excel_Worksheet\d*?\.xlsx`)
+	for _, f := range dt.reader.File {
+		switch {
+		case
+			slices.Contains(toSkip, f.Name),
+			chartsMatcher.MatchString(f.Name),
+			xlsxMatcher.MatchString(f.Name),
+			headerFooterDocumentMatcher.MatchString(f.Name):
+			continue
+		}
+
+		err := utils.CopyOriginalFile(f, zipWriter)
+		if err != nil {
+			return fmt.Errorf("unable to copy original file %s: %w", f.Name, err)
+		}
+	}
+
 	for _, m := range dt.media {
 		filepath := path.Join("word/media", m.Filename)
-		err := utils.WriteFile(filepath, zipWriter, m.Data)
+		err := utils.ZipWriteFile(filepath, zipWriter, m.Data)
 		if err != nil {
 			return fmt.Errorf("unable to write media file %s: %w", filepath, err)
 		}
 	}
 
-	ctFile := "[Content_Types].xml"
-	relFile := "word/_rels/document.xml.rels"
-	for _, f := range dt.reader.File {
-		if f.Name != relFile {
-			continue
-		}
-
-		relData, err := utils.ReadZipFileContent(f)
-		if err != nil {
-			fmt.Println("unable to read rel file")
-			break
-		}
-
-		dt.rel, err = docx.ParseRelationship(relData)
-		if err != nil {
-			fmt.Println("unable to parse relationship file:", err)
-		}
-
-		break
+	relData, err := utils.ReadZipFileContent(zipMap[documentRelsFilename])
+	if err != nil {
+		return fmt.Errorf("unable to read rel file %s: %w", documentRelsFilename, err)
 	}
 
-	toSkip := []string{
-		relFile,
-		ctFile,
+	dt.rel, err = docx.ParseRelationship(relData)
+	if err != nil {
+		return fmt.Errorf("unable to parse rel file %s: %w", documentRelsFilename, err)
 	}
 
 	chartRelToTargetXlsx := make(map[string]string)
-	chartsRelMatcher := regexp.MustCompile(`word/charts/_rels/chart\d*?\.xml.rels`)
-	chartsMatcher := regexp.MustCompile(`word/charts/chart\d*?\.xml`)
-	xlsxMatcher := regexp.MustCompile(`/embeddings/Microsoft_Excel_Worksheet\d*?\.xlsx`)
-	headerFooterDocumentMatcher := regexp.MustCompile(`word/(header|footer|document)\d*?\.xml`)
-	for _, f := range dt.reader.File {
-		if slices.Contains(toSkip, f.Name) {
-			continue
+	for i := 1; ; i++ {
+		relsChartFilename := fmt.Sprintf("word/charts/_rels/chart%d.xml.rels", i)
+		f := zipMap[relsChartFilename]
+		if f == nil {
+			break
 		}
 
-		matchedChartsRel := chartsRelMatcher.MatchString(f.Name)
-		if matchedChartsRel {
-			fileContent, err := utils.ReadZipFileContent(f)
+		fileContent, err := utils.ReadZipFileContent(f)
+		if err != nil {
+			return fmt.Errorf("unable to read chart rel file %s: %w", f.Name, err)
+		}
+
+		chartsRelationships, _ := docx.ParseRelationship(fileContent)
+		for _, relationship := range chartsRelationships.Relationships {
+			if !xlsxMatcher.MatchString(relationship.Target) {
+				continue
+			}
+
+			targetXlsxFilename := strings.Replace(relationship.Target, "../", "word/", 1)
+			chartFilename, err := utils.ExtractChartFilename(f.Name)
 			if err != nil {
-				return fmt.Errorf("unable to read chart rel file %s: %w", f.Name, err)
+				return fmt.Errorf("unable to extract chart name from file %s: %w", f.Name, err)
 			}
+			chartRelToTargetXlsx[chartFilename] = targetXlsxFilename
+		}
+	}
 
-			chartsRelationships, _ := docx.ParseRelationship(fileContent)
-			for _, relationship := range chartsRelationships.Relationships {
-				if !xlsxMatcher.MatchString(relationship.Target) {
-					continue
-				}
-
-				formattedTarget := strings.Replace(relationship.Target, "../", "word/", 1)
-				chartFilename, err := utils.ExtractChartName(f.Name)
-				if err != nil {
-					return fmt.Errorf("unable to extract chart name from file %s: %w", f.Name, err)
-				}
-				chartRelToTargetXlsx[chartFilename] = formattedTarget
-			}
+	// Apply template to the XLSX files
+	for i := 0; ; i++ {
+		xlsxFilename := fmt.Sprintf("word/embeddings/Microsoft_Excel_Worksheet%d.xlsx", i)
+		if i == 0 {
+			xlsxFilename = "word/embeddings/Microsoft_Excel_Worksheet.xlsx"
+		}
+		f := zipMap[xlsxFilename]
+		if f == nil {
+			break
 		}
 
-		matchedChart := chartsMatcher.MatchString(f.Name)
-		if matchedChart {
-			continue
+		err := xlsx.WriteXlsxIntoZip(f, zipWriter, templateValues)
+		if err != nil {
+			return fmt.Errorf("unable to write XLSX file %s: %w", f.Name, err)
 		}
+	}
 
-		matchedXlsx := xlsxMatcher.MatchString(f.Name)
-		if matchedXlsx {
-			err := xlsx.WriteXLSXIntoZip(f, zipWriter, templateValues)
-			if err != nil {
-				return fmt.Errorf("unable to write XLSX file %s: %w", f.Name, err)
-			}
-			continue
-		}
-
-		// I don't know how many headers/footers there are, so I use a regex
-		matchedHeaderFooterDocument := headerFooterDocumentMatcher.MatchString(f.Name)
-		if !matchedHeaderFooterDocument {
-			err := utils.CopyOriginalFile(f, zipWriter)
-			if err != nil {
-				return fmt.Errorf("unable to copy original file %s: %w", f.Name, err)
-			}
-			continue
+	// Apply template to the header files
+	for i := 1; ; i++ {
+		headerFilename := fmt.Sprintf("word/header%d.xml", i)
+		f := zipMap[headerFilename]
+		if f == nil {
+			break
 		}
 
 		media, err := docx.ApplyTemplate(f, zipWriter, templateValues)
@@ -186,96 +197,103 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		dt.relMedia = append(dt.relMedia, media...)
 	}
 
-	for _, f := range dt.reader.File {
-		matchedChart := chartsMatcher.MatchString(f.Name)
-		if !matchedChart {
-			continue
+	// Apply template to the footer files
+	for i := 1; ; i++ {
+		footerFilename := fmt.Sprintf("word/footer%d.xml", i)
+		f := zipMap[footerFilename]
+		if f == nil {
+			break
 		}
 
-		fileContent, err := utils.ReadZipFileContent(f)
-		if err != nil {
-			return fmt.Errorf("unable to read chart file %s: %w", f.Name, err)
-		}
-
-		fileContent, err = xlsx.ApplyTemplateToChart(f, templateValues, fileContent)
+		media, err := docx.ApplyTemplate(f, zipWriter, templateValues)
 		if err != nil {
 			return fmt.Errorf("unable to apply template to file %s: %w", f.Name, err)
 		}
 
-		chartFileNumber, err := utils.ExtractChartName(f.Name)
+		dt.relMedia = append(dt.relMedia, media...)
+	}
+
+	// Apply template to the main document file
+	documentFile := zipMap["word/document.xml"]
+	if documentFile == nil {
+		return fmt.Errorf("word/document.xml not found in the DOCX file")
+	}
+
+	media, err := docx.ApplyTemplate(documentFile, zipWriter, templateValues)
+	if err != nil {
+		return fmt.Errorf("unable to apply template to document file: %w", err)
+	}
+
+	dt.relMedia = append(dt.relMedia, media...)
+
+	// Apply template to the chart files
+	for i := 1; ; i++ {
+		chartN := fmt.Sprintf("word/charts/chart%d.xml", i)
+		f := zipMap[chartN]
+		if f == nil {
+			break
+		}
+
+		fileContent, err := xlsx.ApplyTemplateToXml(f, templateValues)
+		if err != nil {
+			return fmt.Errorf("unable to apply template to file %s: %w", f.Name, err)
+		}
+
+		chartFilename, err := utils.ExtractChartFilename(f.Name)
 		if err != nil {
 			return fmt.Errorf("unable to extract chart name from file %s: %w", f.Name, err)
 		}
 
-		xlsxFileTarget := chartRelToTargetXlsx[chartFileNumber]
+		xlsxFileTarget := chartRelToTargetXlsx[chartFilename]
 		fileContent, err = xlsx.UpdateChart(fileContent, xlsx.XlsxFiles[xlsxFileTarget].ChartNumbers)
 		if err != nil {
 			return fmt.Errorf("unable to replace preview zeros in chart file %s: %w", f.Name, err)
 		}
 
-		w, err := zipWriter.CreateHeader(&f.FileHeader)
+		err = utils.RewriteFileIntoZipWriter(f, zipWriter, fileContent)
 		if err != nil {
-			return fmt.Errorf("error creating file in zip: %w", err)
-		}
-
-		_, err = w.Write(fileContent)
-		if err != nil {
-			return fmt.Errorf("error writing file %s: %w", f.Name, err)
+			return fmt.Errorf("unable to rewrite chart file %s: %w", f.Name, err)
 		}
 	}
 
 	if len(dt.relMedia) != 0 {
 		dt.rel.AddMediaToRels(dt.relMedia)
-		for _, f := range dt.reader.File {
-			if f.Name != relFile {
-				continue
-			}
 
-			xmlContent, err := dt.rel.ToXML()
-			if err != nil {
-				fmt.Println("unable to marshal rels:", err)
-				break
-			}
-
-			err = utils.ReplaceFileContent(f, zipWriter, []byte(xmlContent))
-			if err != nil {
-				fmt.Println("unable to replace rel file:", err)
-				break
-			}
+		fRelFile := zipMap[documentRelsFilename]
+		xmlContent, err := dt.rel.ToXML()
+		if err != nil {
+			return fmt.Errorf("unable to marshal rels: %w", err)
 		}
-		for _, f := range dt.reader.File {
-			if f.Name != ctFile {
-				continue
-			}
 
-			ctData, err := utils.ReadZipFileContent(f)
-			if err != nil {
-				fmt.Println("unable to read content types file")
-				break
-			}
+		err = utils.ReplaceFileContent(fRelFile, zipWriter, []byte(xmlContent))
+		if err != nil {
+			return fmt.Errorf("unable to replace rel file %s: %w", documentRelsFilename, err)
+		}
 
-			contentTypes, err := docx.ParseContentTypes(ctData)
-			if err != nil {
-				fmt.Println("unable to parse content types file:", err)
-			}
+		fCtFile := zipMap[contentTypesFilename]
+		ctData, err := utils.ReadZipFileContent(fCtFile)
+		if err != nil {
+			return fmt.Errorf("unable to read content types file %s: %w", contentTypesFilename, err)
+		}
 
-			contentTypes.EnsureImageDefaults("png", "image/png")
-			updatedCt, err := contentTypes.ToXML()
-			if err != nil {
-				fmt.Println("unable to marshal rels:", err)
-				break
-			}
+		contentTypes, err := docx.ParseContentTypes(ctData)
+		if err != nil {
+			return fmt.Errorf("unable to parse content types file %s: %w", contentTypesFilename, err)
+		}
 
-			err = utils.ReplaceFileContent(f, zipWriter, []byte(updatedCt))
-			if err != nil {
-				fmt.Println("unable to replace rel file:", err)
-				break
-			}
-			break
+		contentTypes.EnsureImageDefaults("png", "image/png")
+		updatedCt, err := contentTypes.ToXML()
+		if err != nil {
+			return fmt.Errorf("unable to marshal content types: %w", err)
+		}
+
+		err = utils.ReplaceFileContent(fCtFile, zipWriter, []byte(updatedCt))
+		if err != nil {
+			return fmt.Errorf("unable to replace content types file %s: %w", contentTypesFilename, err)
 		}
 	}
 
-	err := zipWriter.Close()
+	err = zipWriter.Close()
 	if err != nil {
 		return fmt.Errorf("unable to close zip writer: %w", err)
 	}

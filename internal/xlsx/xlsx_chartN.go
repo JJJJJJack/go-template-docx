@@ -11,6 +11,7 @@ import (
 	"text/template"
 
 	"github.com/JJJJJJack/go-template-docx/internal/docx"
+	"github.com/JJJJJJack/go-template-docx/internal/utils"
 )
 
 type V struct {
@@ -70,9 +71,14 @@ func UpdateChart(fileContent []byte, values []string) ([]byte, error) {
 	return fileContent, nil
 }
 
-func ApplyTemplateToChart(f *zip.File, templateValues any, fileContent []byte) ([]byte, error) {
+func ApplyTemplateToXml(f *zip.File, templateValues any) ([]byte, error) {
+	fileContent, err := utils.ReadZipFileContent(f)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read chart file %s: %w", f.Name, err)
+	}
+
 	tmpl, err := template.New(f.Name).
-		Parse(docx.PatchXML(string(fileContent)))
+		Parse(docx.PatchXml(string(fileContent)))
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse template: %w", err)
 	}

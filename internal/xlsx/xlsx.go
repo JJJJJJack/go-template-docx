@@ -16,7 +16,7 @@ func applyTemplateToCells(f *zip.File, templateValues any, fileContent []byte) (
 		Funcs(template.FuncMap{
 			"toNumberCell": toNumberCell,
 		}).
-		Parse(docx.PatchXML(string(fileContent)))
+		Parse(docx.PatchXml(string(fileContent)))
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse template: %w", err)
 	}
@@ -29,9 +29,9 @@ func applyTemplateToCells(f *zip.File, templateValues any, fileContent []byte) (
 	return buf.Bytes(), nil
 }
 
-// ModifyXLSXInMemoryFromZipFile modifies an internal file inside an XLSX embedded in a zip.File.
+// ModifyXlsxInMemoryFromZipFile modifies an internal file inside an XLSX embedded in a zip.File.
 // It returns a modified XLSX as []byte.
-func ModifyXLSXInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]byte, error) {
+func ModifyXlsxInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]byte, error) {
 	var sharedStringsNumbers map[int]string
 
 	// Read XLSX zip into memory
@@ -132,18 +132,16 @@ func ModifyXLSXInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]by
 	return buf.Bytes(), nil
 }
 
-func WriteXLSXIntoZip(f *zip.File, docxZipWriter *zip.Writer, templateValues any) error {
-	//worksheets/sheet|
-	xlsxBytes, err := ModifyXLSXInMemoryFromZipFile(f, templateValues)
+func WriteXlsxIntoZip(f *zip.File, docxZipWriter *zip.Writer, templateValues any) error {
+	xlsxBytes, err := ModifyXlsxInMemoryFromZipFile(f, templateValues)
 	if err != nil {
 		return fmt.Errorf("error modifying XLSX in memory: %w", err)
 	}
 
-	w, err := docxZipWriter.Create(f.Name)
+	err = utils.RewriteFileIntoZipWriter(f, docxZipWriter, xlsxBytes)
 	if err != nil {
 		return fmt.Errorf("error creating entry in zip: %w", err)
 	}
 
-	_, err = w.Write(xlsxBytes)
-	return err
+	return nil
 }
