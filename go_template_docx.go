@@ -88,9 +88,14 @@ func (dt *docxTemplate) Media(filename string, data []byte) {
 func (dt *docxTemplate) Apply(templateValues any) error {
 	zipWriter := zip.NewWriter(&dt.output)
 
-	zipMap := make(map[string]*zip.File)
+	zipMap := make(utils.ZipMap)
 	for _, f := range dt.reader.File {
 		zipMap[f.Name] = f
+	}
+
+	document, err := docx.ParseDocumentMeta(zipMap)
+	if err != nil {
+		return fmt.Errorf("unable to parse document metadata: %w", err)
 	}
 
 	documentRelsFilename := "word/_rels/document.xml.rels"
@@ -189,7 +194,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 			break
 		}
 
-		media, err := docx.ApplyTemplate(f, zipWriter, templateValues)
+		media, err := document.ApplyTemplate(f, zipWriter, templateValues)
 		if err != nil {
 			return fmt.Errorf("unable to apply template to file %s: %w", f.Name, err)
 		}
@@ -205,7 +210,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 			break
 		}
 
-		media, err := docx.ApplyTemplate(f, zipWriter, templateValues)
+		media, err := document.ApplyTemplate(f, zipWriter, templateValues)
 		if err != nil {
 			return fmt.Errorf("unable to apply template to file %s: %w", f.Name, err)
 		}
@@ -219,7 +224,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		return fmt.Errorf("word/document.xml not found in the DOCX file")
 	}
 
-	media, err := docx.ApplyTemplate(documentFile, zipWriter, templateValues)
+	media, err := document.ApplyTemplate(documentFile, zipWriter, templateValues)
 	if err != nil {
 		return fmt.Errorf("unable to apply template to document file: %w", err)
 	}
@@ -259,13 +264,13 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 	if len(dt.relMedia) != 0 {
 		dt.rel.AddMediaToRels(dt.relMedia)
 
-		fRelFile := zipMap[documentRelsFilename]
+		documentRelFile := zipMap[documentRelsFilename]
 		xmlContent, err := dt.rel.ToXML()
 		if err != nil {
 			return fmt.Errorf("unable to marshal rels: %w", err)
 		}
 
-		err = utils.ReplaceFileContent(fRelFile, zipWriter, []byte(xmlContent))
+		err = utils.ReplaceFileContent(documentRelFile, zipWriter, []byte(xmlContent))
 		if err != nil {
 			return fmt.Errorf("unable to replace rel file %s: %w", documentRelsFilename, err)
 		}

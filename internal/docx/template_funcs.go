@@ -1,35 +1,113 @@
 package docx
 
 import (
-	"bytes"
 	"fmt"
-	"path"
-	"regexp"
-	"strings"
-	"text/template"
 )
 
-var counterID = 100
-
-type ImageData struct {
-	ID    int
-	Name  string
-	RefID string
+type XmlImageData struct {
+	DocPrId uint32
+	Name    string
+	RefID   string
 }
 
-const imageTemplate = `<w:drawing>
+const imageCenterTemplateXml = `<w:p w14:paraId="4E9843FD" w14:textId="77777777" w:rsidR="00963E01" w:rsidRDefault="0028620A"
+      w:rsidP="00963E01">
+      <w:pPr>
+        <w:keepNext />
+        <w:spacing w:after="0" w:line="240" w:lineRule="auto" />
+        <w:jc w:val="center" />
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:rFonts w:eastAsia="Calibri" />
+          <w:noProof />
+          <w:u w:val="single" />
+        </w:rPr>
+        <w:lastRenderedPageBreak />
+        <w:drawing>
+          <wp:inline distT="0" distB="0" distL="0" distR="0" wp14:anchorId="68DC1111"
+            wp14:editId="381D76A9">
+            <wp:extent cx="2543175" cy="2962275" />
+            <wp:effectExtent l="0" t="0" r="0" b="0" />
+            <wp:docPr id="1228041855" name="Picture 1" />
+            <wp:cNvGraphicFramePr>
+              <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                noChangeAspect="1" />
+            </wp:cNvGraphicFramePr>
+            <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="0" name="Picture 1" />
+                    <pic:cNvPicPr>
+                      <a:picLocks noChangeAspect="1" noChangeArrowheads="1" />
+                    </pic:cNvPicPr>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="rId10">
+                      <a:extLst>
+                        <a:ext uri="{28A0092B-C50C-407E-A947-70E740481C1C}">
+                          <a14:useLocalDpi
+                            xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main"
+                            val="0" />
+                        </a:ext>
+                      </a:extLst>
+                    </a:blip>
+                    <a:srcRect />
+                    <a:stretch>
+                      <a:fillRect />
+                    </a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr bwMode="auto">
+                    <a:xfrm>
+                      <a:off x="0" y="0" />
+                      <a:ext cx="2543175" cy="2962275" />
+                    </a:xfrm>
+                    <a:prstGeom prst="rect">
+                      <a:avLst />
+                    </a:prstGeom>
+                    <a:noFill />
+                    <a:ln>
+                      <a:noFill />
+                    </a:ln>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>
+    </w:p>
+		`
+
+const imageCaptionTemplateXml = `<w:p w14:paraId="1F0BA56D" w14:textId="39A991DB" w:rsidR="00F55C40" w:rsidRDefault="00963E01"
+      w:rsidP="00963E01">
+      <w:pPr>
+        <w:pStyle w:val="Caption" />
+        <w:jc w:val="center" />
+        <w:rPr>
+          <w:rFonts w:eastAsia="Calibri" />
+          <w:u w:val="single" />
+        </w:rPr>
+      </w:pPr>
+      <w:r>
+        <w:t>{{.Caption}}</w:t>
+      </w:r>
+    </w:p>`
+
+const imageTemplateXml = `<w:drawing>
   <wp:inline distT="0" distB="0" distL="0" distR="0"
     xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
     xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
     xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"
     xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
     <wp:extent cx="2489026" cy="2489026" />
-    <wp:docPr id="{{.ID}}" name="{{.Name}}" />
+    <wp:docPr id="{{.DocPrId}}" name="{{.Name}}" />
     <a:graphic>
       <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
         <pic:pic>
           <pic:nvPicPr>
-            <pic:cNvPr id="{{.ID}}" name="{{.Name}}" />
+            <pic:cNvPr id="0" name="{{.Name}}" />
             <pic:cNvPicPr />
           </pic:nvPicPr>
           <pic:blipFill>
@@ -57,49 +135,6 @@ func toImage(s string) string {
 	return fmt.Sprintf("[[IMAGE:%s]]", s)
 }
 
-func generateSequentialReferenceID() string {
-	counterID++
-
-	return fmt.Sprintf("rId%d", counterID)
-}
-
-func applyImages(srcXML string) (string, []MediaRel, error) {
-	mediaList := []MediaRel{}
-
-	re := regexp.MustCompile(`<w:[A-Za-z]?>\[\[IMAGE:.*?\]\]</w:[A-Za-z]>`)
-	imagePlaceholderRE := regexp.MustCompile(`\[\[IMAGE:.*?\]\]`)
-	xmlBlocks := re.FindAllString(srcXML, -1)
-	for _, xmlBlock := range xmlBlocks {
-		imageTemplate, err := template.New("image-template").Parse(imageTemplate)
-		if err != nil {
-			return srcXML, mediaList, err
-		}
-
-		imageDirections := imagePlaceholderRE.FindAllString(xmlBlock, -1)
-		if len(imageDirections) < 1 {
-			continue
-		}
-
-		filename := strings.TrimPrefix(imageDirections[0], "[[IMAGE:")
-		filename = strings.TrimSuffix(filename, "]]")
-
-		buffer := bytes.Buffer{}
-		refID := generateSequentialReferenceID()
-
-		imageTemplate.Execute(&buffer, ImageData{
-			ID:    counterID,
-			Name:  filename,
-			RefID: refID,
-		})
-
-		mediaList = append(mediaList, MediaRel{
-			Type:   ImageMediaType,
-			RefID:  refID,
-			Source: path.Join("media", filename),
-		})
-
-		srcXML = strings.ReplaceAll(srcXML, xmlBlock, buffer.String())
-	}
-
-	return srcXML, mediaList, nil
+func toCenteredImage(s string) string {
+	return fmt.Sprintf("[[CENTERED_IMAGE:%s]]", s)
 }

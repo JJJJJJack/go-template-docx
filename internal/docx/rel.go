@@ -46,7 +46,9 @@ func (r *Relationship) ToXML() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return xml.Header + string(output), nil
+
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+	` + string(output), nil
 }
 
 func ParseRelationship(data []byte) (*Relationship, error) {

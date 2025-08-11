@@ -7,6 +7,8 @@ import (
 	"regexp"
 )
 
+type ZipMap map[string]*zip.File
+
 func CopyOriginalFile(f *zip.File, zipWriter *zip.Writer) error {
 	fileInZip, err := f.Open()
 	if err != nil {
