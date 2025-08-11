@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"regexp"
-	"slices"
 	"strings"
 	"time"
 
@@ -100,20 +99,40 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 
 	documentRelsFilename := "word/_rels/document.xml.rels"
 	contentTypesFilename := "[Content_Types].xml"
-	toSkip := []string{
-		documentRelsFilename,
-		contentTypesFilename,
-	}
 	chartsMatcher := regexp.MustCompile(`word/charts/chart\d*?\.xml`)
 	headerFooterDocumentMatcher := regexp.MustCompile(`word/(header|footer|document)\d*?\.xml`)
 	xlsxMatcher := regexp.MustCompile(`/embeddings/Microsoft_Excel_Worksheet\d*?\.xlsx`)
 	for _, f := range dt.reader.File {
 		switch {
 		case
-			slices.Contains(toSkip, f.Name),
+			f.Name == documentRelsFilename,
 			chartsMatcher.MatchString(f.Name),
 			xlsxMatcher.MatchString(f.Name),
 			headerFooterDocumentMatcher.MatchString(f.Name):
+			continue
+		case f.Name == contentTypesFilename:
+			fCtFile := zipMap[contentTypesFilename]
+			ctData, err := utils.ReadZipFileContent(fCtFile)
+			if err != nil {
+				return fmt.Errorf("unable to read content types file %s: %w", contentTypesFilename, err)
+			}
+
+			contentTypes, err := docx.ParseContentTypes(ctData)
+			if err != nil {
+				return fmt.Errorf("unable to parse content types file %s: %w", contentTypesFilename, err)
+			}
+
+			contentTypes.EnsureImageDefaults("png", "image/png")
+			updatedCt, err := contentTypes.ToXML()
+			if err != nil {
+				return fmt.Errorf("unable to marshal content types: %w", err)
+			}
+
+			err = utils.ReplaceFileContent(fCtFile, zipWriter, []byte(updatedCt))
+			if err != nil {
+				return fmt.Errorf("unable to replace content types file %s: %w", contentTypesFilename, err)
+			}
+
 			continue
 		}
 
@@ -273,28 +292,6 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		err = utils.ReplaceFileContent(documentRelFile, zipWriter, []byte(xmlContent))
 		if err != nil {
 			return fmt.Errorf("unable to replace rel file %s: %w", documentRelsFilename, err)
-		}
-
-		fCtFile := zipMap[contentTypesFilename]
-		ctData, err := utils.ReadZipFileContent(fCtFile)
-		if err != nil {
-			return fmt.Errorf("unable to read content types file %s: %w", contentTypesFilename, err)
-		}
-
-		contentTypes, err := docx.ParseContentTypes(ctData)
-		if err != nil {
-			return fmt.Errorf("unable to parse content types file %s: %w", contentTypesFilename, err)
-		}
-
-		contentTypes.EnsureImageDefaults("png", "image/png")
-		updatedCt, err := contentTypes.ToXML()
-		if err != nil {
-			return fmt.Errorf("unable to marshal content types: %w", err)
-		}
-
-		err = utils.ReplaceFileContent(fCtFile, zipWriter, []byte(updatedCt))
-		if err != nil {
-			return fmt.Errorf("unable to replace content types file %s: %w", contentTypesFilename, err)
 		}
 	}
 
