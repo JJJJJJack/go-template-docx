@@ -6,3 +6,4 @@ output*
 report-template*
 *.exe
 cmd/
+assets/
