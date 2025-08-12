@@ -97,6 +97,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		return fmt.Errorf("unable to parse document metadata: %w", err)
 	}
 
+	// Copy all files except the ones that will be processed
 	documentRelsFilename := "word/_rels/document.xml.rels"
 	contentTypesFilename := "[Content_Types].xml"
 	chartsMatcher := regexp.MustCompile(`word/charts/chart\d*?\.xml`)
@@ -106,33 +107,10 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		switch {
 		case
 			f.Name == documentRelsFilename,
+			f.Name == contentTypesFilename,
 			chartsMatcher.MatchString(f.Name),
 			xlsxMatcher.MatchString(f.Name),
 			headerFooterDocumentMatcher.MatchString(f.Name):
-			continue
-		case f.Name == contentTypesFilename:
-			fCtFile := zipMap[contentTypesFilename]
-			ctData, err := utils.ReadZipFileContent(fCtFile)
-			if err != nil {
-				return fmt.Errorf("unable to read content types file %s: %w", contentTypesFilename, err)
-			}
-
-			contentTypes, err := docx.ParseContentTypes(ctData)
-			if err != nil {
-				return fmt.Errorf("unable to parse content types file %s: %w", contentTypesFilename, err)
-			}
-
-			contentTypes.EnsureImageDefaults("png", "image/png")
-			updatedCt, err := contentTypes.ToXML()
-			if err != nil {
-				return fmt.Errorf("unable to marshal content types: %w", err)
-			}
-
-			err = utils.ReplaceFileContent(fCtFile, zipWriter, []byte(updatedCt))
-			if err != nil {
-				return fmt.Errorf("unable to replace content types file %s: %w", contentTypesFilename, err)
-			}
-
 			continue
 		}
 
@@ -142,6 +120,43 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		}
 	}
 
+	// Edit [Content_Types].xml if media files are provided
+	ctFile := zipMap["[Content_Types].xml"]
+	ctData, err := utils.ReadZipFileContent(ctFile)
+	if err != nil {
+		return fmt.Errorf("unable to read content types file %s: %w", ctFile.Name, err)
+	}
+
+	contentTypes, err := docx.ParseContentTypes(ctData)
+	if err != nil {
+		return fmt.Errorf("unable to parse content types file %s: %w", ctFile.Name, err)
+	}
+
+	for _, media := range dt.media {
+		ext := path.Ext(media.Filename)
+
+		switch strings.ToLower(ext) {
+		case ".jpg", ".jpeg", "jfif":
+			contentTypes.AddDefaultUnique("jpeg", "image/jpeg")
+		case ".png":
+			contentTypes.AddDefaultUnique("png", "image/png")
+		default:
+			fmt.Println("Unsupported media file type (only accepting jpg/png for now):", media.Filename)
+			continue
+		}
+
+	}
+	updatedCt, err := contentTypes.ToXML()
+	if err != nil {
+		return fmt.Errorf("unable to marshal content types: %w", err)
+	}
+
+	err = utils.ReplaceFileContent(ctFile, zipWriter, []byte(updatedCt))
+	if err != nil {
+		return fmt.Errorf("unable to replace content types file %s: %w", ctFile.Name, err)
+	}
+
+	// Put loaded medias into the zip file
 	for _, m := range dt.media {
 		filepath := path.Join("word/media", m.Filename)
 		err := utils.ZipWriteFile(filepath, zipWriter, m.Data)
@@ -160,6 +175,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		return fmt.Errorf("unable to parse rel file %s: %w", documentRelsFilename, err)
 	}
 
+	// Map chart files to their target XLSX files
 	chartRelToTargetXlsx := make(map[string]string)
 	for i := 1; ; i++ {
 		relsChartFilename := fmt.Sprintf("word/charts/_rels/chart%d.xml.rels", i)

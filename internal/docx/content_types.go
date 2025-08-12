@@ -4,20 +4,20 @@ import (
 	"encoding/xml"
 )
 
-type defaultContent struct {
+type tagDefault struct {
 	Extension   string `xml:"Extension,attr"`
 	ContentType string `xml:"ContentType,attr"`
 }
 
-type overrideContent struct {
+type tagOverride struct {
 	PartName    string `xml:"PartName,attr"`
 	ContentType string `xml:"ContentType,attr"`
 }
 
 type contentTypes struct {
-	XMLName   xml.Name          `xml:"http://schemas.openxmlformats.org/package/2006/content-types Types"`
-	Defaults  []defaultContent  `xml:"Default"`
-	Overrides []overrideContent `xml:"Override"`
+	XMLName   xml.Name      `xml:"http://schemas.openxmlformats.org/package/2006/content-types Types"`
+	Defaults  []tagDefault  `xml:"Default"`
+	Overrides []tagOverride `xml:"Override"`
 }
 
 func ParseContentTypes(data []byte) (*contentTypes, error) {
@@ -29,15 +29,17 @@ func ParseContentTypes(data []byte) (*contentTypes, error) {
 	return &ct, nil
 }
 
-func (ct *contentTypes) EnsureImageDefaults(ext string, mime string) {
+// AddDefaultUnique adds a default content type if it does not already exist in the list.
+func (ct *contentTypes) AddDefaultUnique(extension, contentType string) {
 	for _, d := range ct.Defaults {
-		if d.Extension == ext {
+		if d.Extension == extension && d.ContentType == contentType {
 			return
 		}
 	}
-	ct.Defaults = append(ct.Defaults, defaultContent{
-		Extension:   ext,
-		ContentType: mime,
+
+	ct.Defaults = append(ct.Defaults, tagDefault{
+		Extension:   extension,
+		ContentType: contentType,
 	})
 }
 
