@@ -5,3 +5,4 @@
 output*
 report-template*
 *.exe
+cmd/
