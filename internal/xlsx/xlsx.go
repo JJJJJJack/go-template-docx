@@ -61,7 +61,7 @@ func ModifyXlsxInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]by
 
 		fileContent, err := utils.ReadZipFileContent(f)
 		if err != nil {
-			return nil, fmt.Errorf("error reading file %s: %w", f.Name, err)
+			return nil, fmt.Errorf("error reading file '%s': %w", f.Name, err)
 		}
 
 		w, err := zipWriter.CreateHeader(&f.FileHeader)
@@ -73,7 +73,7 @@ func ModifyXlsxInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]by
 		if matchedSharedStrings {
 			fileContent, err = applyTemplateToCells(f, templateValues, fileContent)
 			if err != nil {
-				return nil, fmt.Errorf("error applying template to file %s: %w", f.Name, err)
+				return nil, fmt.Errorf("error applying template to file '%s': %w", f.Name, err)
 			}
 
 			found = true
@@ -81,7 +81,7 @@ func ModifyXlsxInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]by
 		}
 
 		if _, err := w.Write(fileContent); err != nil {
-			return nil, fmt.Errorf("error writing file %s: %w", f.Name, err)
+			return nil, fmt.Errorf("error writing file '%s': %w", f.Name, err)
 		}
 	}
 
@@ -93,12 +93,12 @@ func ModifyXlsxInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]by
 
 		fileContent, err := utils.ReadZipFileContent(f)
 		if err != nil {
-			return nil, fmt.Errorf("error reading file %s: %w", f.Name, err)
+			return nil, fmt.Errorf("error reading zip file content '%s': %w", f.Name, err)
 		}
 
 		w, err := zipWriter.CreateHeader(&f.FileHeader)
 		if err != nil {
-			return nil, fmt.Errorf("error creating file in zip: %w", err)
+			return nil, fmt.Errorf("error creating header file in zip: %w", err)
 		}
 
 		matchedChartN := sheetNMatcher.MatchString(f.Name)
@@ -106,7 +106,7 @@ func ModifyXlsxInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]by
 			var chartValues []string
 			fileContent, chartValues, err = ReplaceSharedStringIndicesWithValues(fileContent, sharedStringsNumbers)
 			if err != nil {
-				return nil, fmt.Errorf("error replacing indexes in file %s: %w", f.Name, err)
+				return nil, fmt.Errorf("error replacing shared strings indexes in file '%s': %w", f.Name, err)
 			}
 
 			XlsxFiles[xlsxFile.Name] = XlsxData{
@@ -117,12 +117,12 @@ func ModifyXlsxInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]by
 		}
 
 		if _, err := w.Write(fileContent); err != nil {
-			return nil, fmt.Errorf("error writing file %s: %w", f.Name, err)
+			return nil, fmt.Errorf("error writing file '%s': %w", f.Name, err)
 		}
 	}
 
 	if !found {
-		return nil, fmt.Errorf("internal file %s not found in embedded XLSX", sharedStringsMatcher.String())
+		return nil, fmt.Errorf("internal file '%s' not found in embedded XLSX", sharedStringsMatcher.String())
 	}
 
 	if err := zipWriter.Close(); err != nil {

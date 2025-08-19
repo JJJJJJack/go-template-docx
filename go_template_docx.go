@@ -26,6 +26,8 @@ type docxTemplate struct {
 	media          []docx.Media
 }
 
+// NewDocxTemplateFromBytes creates a new docxTemplate object from the provided DOCX file bytes.
+// The docxTemplate object can be used through the exposed high-level APIs.
 func NewDocxTemplateFromBytes(docxBytes []byte) (*docxTemplate, error) {
 	bytesReader := bytes.NewReader(docxBytes)
 	if bytesReader == nil {
@@ -34,7 +36,7 @@ func NewDocxTemplateFromBytes(docxBytes []byte) (*docxTemplate, error) {
 
 	docxReader, err := zip.NewReader(bytesReader, int64(len(docxBytes)))
 	if err != nil {
-		return nil, fmt.Errorf("unable to create reader for DOCX file: %v", err)
+		return nil, fmt.Errorf("unable to create zip reader for DOCX file: %w", err)
 	}
 
 	return &docxTemplate{
@@ -48,22 +50,23 @@ func NewDocxTemplateFromBytes(docxBytes []byte) (*docxTemplate, error) {
 	}, nil
 }
 
+// NewDocxTemplateFromFilename creates a new docxTemplate object from the provided DOCX filename (reading from disk).
+// The docxTemplate object can be used through the exposed high-level APIs.
 func NewDocxTemplateFromFilename(docxFilename string) (*docxTemplate, error) {
 	docxBytes, err := os.ReadFile(docxFilename)
 	if err != nil {
-		fmt.Println("Error reading DOCX file:", err)
-		return nil, err
+		return nil, fmt.Errorf("unable to read file %s: %w", docxFilename, err)
 	}
 
 	bytesReader := bytes.NewReader(docxBytes)
 	if bytesReader == nil {
-		return nil, fmt.Errorf("unable to get bytes reader for DOCX file %s",
+		return nil, fmt.Errorf("unable to create bytes reader for DOCX file %s",
 			docxFilename)
 	}
 
 	docxReader, err := zip.NewReader(bytesReader, int64(len(docxBytes)))
 	if err != nil {
-		return nil, fmt.Errorf("unable to get zip reader for DOCX file %s: %v", docxFilename, err)
+		return nil, fmt.Errorf("unable to create zip reader for DOCX file %s: %w", docxFilename, err)
 	}
 
 	return &docxTemplate{
@@ -77,6 +80,11 @@ func NewDocxTemplateFromFilename(docxFilename string) (*docxTemplate, error) {
 	}, nil
 }
 
+// Media adds a media file to the docxTemplate object.
+// The media file will be included in the final DOCX output.
+// The filename should be the name of the file as it will appear in the DOCX media folder.
+// The data should be the byte content of the media file.
+// Supported media types are currently limited to JPEG and PNG images.
 func (dt *docxTemplate) Media(filename string, data []byte) {
 	dt.media = append(dt.media, docx.Media{
 		Filename: filename,
@@ -84,6 +92,8 @@ func (dt *docxTemplate) Media(filename string, data []byte) {
 	})
 }
 
+// Apply applies the template with the provided values to the DOCX file.
+// The templateValues parameter can be any type that can be marshalled to JSON.
 func (dt *docxTemplate) Apply(templateValues any) error {
 	zipWriter := zip.NewWriter(&dt.output)
 
@@ -116,7 +126,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 
 		err := utils.CopyOriginalFile(f, zipWriter)
 		if err != nil {
-			return fmt.Errorf("unable to copy original file %s: %w", f.Name, err)
+			return fmt.Errorf("unable to copy original file '%s': %w", f.Name, err)
 		}
 	}
 
@@ -124,12 +134,12 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 	ctFile := zipMap["[Content_Types].xml"]
 	ctData, err := utils.ReadZipFileContent(ctFile)
 	if err != nil {
-		return fmt.Errorf("unable to read content types file %s: %w", ctFile.Name, err)
+		return fmt.Errorf("unable to read content types file '%s': %w", ctFile.Name, err)
 	}
 
 	contentTypes, err := docx.ParseContentTypes(ctData)
 	if err != nil {
-		return fmt.Errorf("unable to parse content types file %s: %w", ctFile.Name, err)
+		return fmt.Errorf("unable to parse content types file '%s': %w", ctFile.Name, err)
 	}
 
 	for _, media := range dt.media {
@@ -144,35 +154,35 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 			fmt.Println("Unsupported media file type (only accepting jpg/png for now):", media.Filename)
 			continue
 		}
-
 	}
-	updatedCt, err := contentTypes.ToXML()
+
+	updatedCt, err := contentTypes.ToXml()
 	if err != nil {
-		return fmt.Errorf("unable to marshal content types: %w", err)
+		return fmt.Errorf("unable to marshal content types to XML: %w", err)
 	}
 
 	err = utils.ReplaceFileContent(ctFile, zipWriter, []byte(updatedCt))
 	if err != nil {
-		return fmt.Errorf("unable to replace content types file %s: %w", ctFile.Name, err)
+		return fmt.Errorf("unable to replace content types file '%s': %w", ctFile.Name, err)
 	}
 
-	// Put loaded medias into the zip file
+	// Put loaded medias into the new docx file
 	for _, m := range dt.media {
 		filepath := path.Join("word/media", m.Filename)
 		err := utils.ZipWriteFile(filepath, zipWriter, m.Data)
 		if err != nil {
-			return fmt.Errorf("unable to write media file %s: %w", filepath, err)
+			return fmt.Errorf("unable to write media file '%s': %w", filepath, err)
 		}
 	}
 
 	relData, err := utils.ReadZipFileContent(zipMap[documentRelsFilename])
 	if err != nil {
-		return fmt.Errorf("unable to read rel file %s: %w", documentRelsFilename, err)
+		return fmt.Errorf("unable to read rel file '%s': %w", documentRelsFilename, err)
 	}
 
 	dt.rel, err = docx.ParseRelationship(relData)
 	if err != nil {
-		return fmt.Errorf("unable to parse rel file %s: %w", documentRelsFilename, err)
+		return fmt.Errorf("unable to parse rel file '%s': %w", documentRelsFilename, err)
 	}
 
 	// Map chart files to their target XLSX files
@@ -186,7 +196,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 
 		fileContent, err := utils.ReadZipFileContent(f)
 		if err != nil {
-			return fmt.Errorf("unable to read chart rel file %s: %w", f.Name, err)
+			return fmt.Errorf("unable to read chart rel file '%s': %w", f.Name, err)
 		}
 
 		chartsRelationships, _ := docx.ParseRelationship(fileContent)
@@ -198,7 +208,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 			targetXlsxFilename := strings.Replace(relationship.Target, "../", "word/", 1)
 			chartFilename, err := utils.ExtractChartFilename(f.Name)
 			if err != nil {
-				return fmt.Errorf("unable to extract chart name from file %s: %w", f.Name, err)
+				return fmt.Errorf("unable to extract chart name from file '%s': %w", f.Name, err)
 			}
 			chartRelToTargetXlsx[chartFilename] = targetXlsxFilename
 		}
@@ -217,7 +227,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 
 		err := xlsx.WriteXlsxIntoZip(f, zipWriter, templateValues)
 		if err != nil {
-			return fmt.Errorf("unable to write XLSX file %s: %w", f.Name, err)
+			return fmt.Errorf("unable to apply template to XLSX file '%s': %w", f.Name, err)
 		}
 	}
 
@@ -231,7 +241,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 
 		media, err := document.ApplyTemplate(f, zipWriter, templateValues)
 		if err != nil {
-			return fmt.Errorf("unable to apply template to file %s: %w", f.Name, err)
+			return fmt.Errorf("unable to apply template to header file '%s': %w", f.Name, err)
 		}
 
 		dt.relMedia = append(dt.relMedia, media...)
@@ -247,7 +257,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 
 		media, err := document.ApplyTemplate(f, zipWriter, templateValues)
 		if err != nil {
-			return fmt.Errorf("unable to apply template to file %s: %w", f.Name, err)
+			return fmt.Errorf("unable to apply template to footer file '%s': %w", f.Name, err)
 		}
 
 		dt.relMedia = append(dt.relMedia, media...)
@@ -276,23 +286,23 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 
 		fileContent, err := xlsx.ApplyTemplateToXml(f, templateValues)
 		if err != nil {
-			return fmt.Errorf("unable to apply template to file %s: %w", f.Name, err)
+			return fmt.Errorf("unable to apply template to chart file '%s': %w", f.Name, err)
 		}
 
 		chartFilename, err := utils.ExtractChartFilename(f.Name)
 		if err != nil {
-			return fmt.Errorf("unable to extract chart name from file %s: %w", f.Name, err)
+			return fmt.Errorf("unable to extract chart name from file '%s': %w", f.Name, err)
 		}
 
 		xlsxFileTarget := chartRelToTargetXlsx[chartFilename]
 		fileContent, err = xlsx.UpdateChart(fileContent, xlsx.XlsxFiles[xlsxFileTarget].ChartNumbers)
 		if err != nil {
-			return fmt.Errorf("unable to replace preview zeros in chart file %s: %w", f.Name, err)
+			return fmt.Errorf("unable to update preview chart file '%s': %w", f.Name, err)
 		}
 
 		err = utils.RewriteFileIntoZipWriter(f, zipWriter, fileContent)
 		if err != nil {
-			return fmt.Errorf("unable to rewrite chart file %s: %w", f.Name, err)
+			return fmt.Errorf("unable to rewrite chart file '%s': %w", f.Name, err)
 		}
 	}
 
@@ -300,6 +310,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		dt.rel.AddMediaToRels(dt.relMedia)
 
 		documentRelFile := zipMap[documentRelsFilename]
+
 		xmlContent, err := dt.rel.ToXML()
 		if err != nil {
 			return fmt.Errorf("unable to marshal rels: %w", err)
@@ -307,7 +318,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 
 		err = utils.ReplaceFileContent(documentRelFile, zipWriter, []byte(xmlContent))
 		if err != nil {
-			return fmt.Errorf("unable to replace rel file %s: %w", documentRelsFilename, err)
+			return fmt.Errorf("unable to replace rel file '%s': %w", documentRelsFilename, err)
 		}
 	}
 
@@ -343,6 +354,8 @@ func (dt *docxTemplate) Save(filenames ...string) error {
 	return os.WriteFile(filename, dt.output.Bytes(), 0644)
 }
 
+// Bytes returns the output bytes of the output DOCX file bytes
+// (empty if Apply was not used).
 func (dt *docxTemplate) Bytes() []byte {
 	return dt.output.Bytes()
 }

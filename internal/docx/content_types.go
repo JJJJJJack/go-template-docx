@@ -43,7 +43,7 @@ func (ct *contentTypes) AddDefaultUnique(extension, contentType string) {
 	})
 }
 
-func (ct *contentTypes) ToXML() (string, error) {
+func (ct *contentTypes) ToXml() (string, error) {
 	output, err := xml.MarshalIndent(ct, "", "  ")
 	if err != nil {
 		return "", err

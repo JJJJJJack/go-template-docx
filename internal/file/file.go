@@ -13,7 +13,6 @@ func FindFirstMissingFile(filenames []string) (string, error) {
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
 			return filename, nil
 		} else if err != nil {
-			// Other errors (e.g. permission denied)
 			return "", fmt.Errorf("error checking %q: %w", filename, err)
 		}
 	}

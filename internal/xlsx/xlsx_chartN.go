@@ -74,7 +74,7 @@ func UpdateChart(fileContent []byte, values []string) ([]byte, error) {
 func ApplyTemplateToXml(f *zip.File, templateValues any) ([]byte, error) {
 	fileContent, err := utils.ReadZipFileContent(f)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read chart file %s: %w", f.Name, err)
+		return nil, fmt.Errorf("unable to read chart file '%s': %w", f.Name, err)
 	}
 
 	tmpl, err := template.New(f.Name).

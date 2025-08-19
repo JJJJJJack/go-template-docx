@@ -24,7 +24,7 @@ type documentMeta struct {
 	greaterChartNumber     uint64
 }
 
-const DOC_PR_ID_ROOF = 2_147_483_648 // docx id attributes are 32-bit signed integers
+const DOC_PR_ID_ROOF = 2_147_483_647 // docx id attributes are 32-bit signed integers
 
 // rotl32 rotates a 32-bit integer left by k bits.
 func rotl32(x uint32, k uint) uint32 {
@@ -81,12 +81,12 @@ func ParseDocumentMeta(zm utils.ZipMap) (*documentMeta, error) {
 
 	documentFile := zm["word/document.xml"]
 	if documentFile == nil {
-		return nil, fmt.Errorf("word/document.xml not found in zip")
+		return nil, fmt.Errorf("word/document.xml not found in docx")
 	}
 
 	documentContent, err := utils.ReadZipFileContent(documentFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading zip file content: %w", err)
 	}
 
 	idAndPictureNRegEx := regexp.MustCompile(`<wp:docPr\s+id="(\d+)"\s+name="Picture\s+(\d+)"\s*/>`)
@@ -96,14 +96,14 @@ func ParseDocumentMeta(zm utils.ZipMap) (*documentMeta, error) {
 	for _, m := range docPrAttrsMatches {
 		docPrId, err := strconv.ParseUint(m[1], 10, 32)
 		if err != nil {
-			return nil, fmt.Errorf("could not parse DocPr ID %s: %w", m[1], err)
+			return nil, fmt.Errorf("could not parse DocPr ID '%s': %w", m[1], err)
 		}
 
 		d.docPrIds = append(d.docPrIds, uint32(docPrId))
 
 		pictureNumber, err := strconv.ParseUint(m[2], 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("could not parse Picture Number %s: %w", m[2], err)
+			return nil, fmt.Errorf("could not parse Picture Number '%s': %w", m[2], err)
 		}
 
 		if pictureNumber > d.greaterPictureNumber {
@@ -120,7 +120,7 @@ func ParseDocumentMeta(zm utils.ZipMap) (*documentMeta, error) {
 
 	wordDocumentRelsContent, err := utils.ReadZipFileContent(wordDocumentRelsFile)
 	if err != nil {
-		return nil, fmt.Errorf("could not read word/_rels/document.xml.rels: %w", err)
+		return nil, fmt.Errorf("could not read zip file content: %w", err)
 	}
 
 	rIdNRegEx := regexp.MustCompile(`"rId(\d+)"`)
@@ -129,7 +129,7 @@ func ParseDocumentMeta(zm utils.ZipMap) (*documentMeta, error) {
 	for _, match := range rIdMatches {
 		num, err := strconv.ParseUint(match[1], 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("could not parse rId %s: %w", match[1], err)
+			return nil, fmt.Errorf("could not parse rId '%s': %w", match[1], err)
 		}
 		if num > d.greaterRId {
 			d.greaterRId = num
@@ -192,7 +192,7 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]MediaRel, error) {
 	documentXml, err := utils.ReadZipFileContent(f)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read document file %s: %w", f.Name, err)
+		return nil, fmt.Errorf("unable to read document file '%s': %w", f.Name, err)
 	}
 
 	documentXml = []byte(PatchXml(string(documentXml)))
@@ -203,25 +203,25 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 		}).
 		Parse(string(documentXml))
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse template in file %s: %w", f.Name, err)
+		return nil, fmt.Errorf("unable to parse template in file '%s': %w", f.Name, err)
 	}
 
 	appliedTemplate := bytes.Buffer{}
 	err = tmpl.Execute(&appliedTemplate, data)
 	if err != nil {
-		return nil, fmt.Errorf("unable to execute template in file %s: %w", f.Name, err)
+		return nil, fmt.Errorf("unable to execute template in file '%s': %w", f.Name, err)
 	}
 
 	output, media, err := d.applyImages(appliedTemplate.String())
 	if err != nil {
-		return nil, fmt.Errorf("unable to apply images in file %s: %w", f.Name, err)
+		return nil, fmt.Errorf("unable to apply images in file '%s': %w", f.Name, err)
 	}
 
 	output = postProcessing(output)
 
 	err = utils.RewriteFileIntoZipWriter(f, zipWriter, []byte(output))
 	if err != nil {
-		return nil, fmt.Errorf("unable to rewrite file %s in zip: %w", f.Name, err)
+		return nil, fmt.Errorf("unable to rewrite file '%s' in zip: %w", f.Name, err)
 	}
 
 	return media, nil
