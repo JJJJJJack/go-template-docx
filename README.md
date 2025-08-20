@@ -1,3 +1,5 @@
+[![Go Reference](https://pkg.go.dev/badge/github.com/JJJJJJack/go-template-docx@v1.0.0.svg)](https://pkg.go.dev/github.com/JJJJJJack/go-template-docx@v1.0.0)
+
 `go get github.com/JJJJJJack/go-template-docx`
 
 # Notes
