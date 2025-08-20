@@ -330,7 +330,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 	return nil
 }
 
-// Save iterates over filenames and write the output docx for the first non esistent file.
+// Save iterates over filenames and write the output docx for the first non existent file.
 // If a single filename string is provided, the file gets overwritten.
 // If no filenames are provided, it saves the file with a timestamp or the provided original filename
 // if the DocxTemplate object was created with the NewDocxTemplateFromFilename function.
