@@ -16,7 +16,7 @@ import (
 	"github.com/JJJJJJack/go-template-docx/internal/xlsx"
 )
 
-type docxTemplate struct {
+type DocxTemplate struct {
 	outputFilename string
 	bytes          []byte
 	reader         *zip.Reader
@@ -26,9 +26,9 @@ type docxTemplate struct {
 	media          []docx.Media
 }
 
-// NewDocxTemplateFromBytes creates a new docxTemplate object from the provided DOCX file bytes.
-// The docxTemplate object can be used through the exposed high-level APIs.
-func NewDocxTemplateFromBytes(docxBytes []byte) (*docxTemplate, error) {
+// NewDocxTemplateFromBytes creates a new DocxTemplate object from the provided DOCX file bytes.
+// The DocxTemplate object can be used through the exposed high-level APIs.
+func NewDocxTemplateFromBytes(docxBytes []byte) (*DocxTemplate, error) {
 	bytesReader := bytes.NewReader(docxBytes)
 	if bytesReader == nil {
 		return nil, fmt.Errorf("unable to create bytes reader for DOCX file")
@@ -39,7 +39,7 @@ func NewDocxTemplateFromBytes(docxBytes []byte) (*docxTemplate, error) {
 		return nil, fmt.Errorf("unable to create zip reader for DOCX file: %w", err)
 	}
 
-	return &docxTemplate{
+	return &DocxTemplate{
 		outputFilename: "",
 		bytes:          docxBytes,
 		reader:         docxReader,
@@ -50,9 +50,9 @@ func NewDocxTemplateFromBytes(docxBytes []byte) (*docxTemplate, error) {
 	}, nil
 }
 
-// NewDocxTemplateFromFilename creates a new docxTemplate object from the provided DOCX filename (reading from disk).
-// The docxTemplate object can be used through the exposed high-level APIs.
-func NewDocxTemplateFromFilename(docxFilename string) (*docxTemplate, error) {
+// NewDocxTemplateFromFilename creates a new DocxTemplate object from the provided DOCX filename (reading from disk).
+// The DocxTemplate object can be used through the exposed high-level APIs.
+func NewDocxTemplateFromFilename(docxFilename string) (*DocxTemplate, error) {
 	docxBytes, err := os.ReadFile(docxFilename)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read file %s: %w", docxFilename, err)
@@ -69,7 +69,7 @@ func NewDocxTemplateFromFilename(docxFilename string) (*docxTemplate, error) {
 		return nil, fmt.Errorf("unable to create zip reader for DOCX file %s: %w", docxFilename, err)
 	}
 
-	return &docxTemplate{
+	return &DocxTemplate{
 		outputFilename: docxFilename,
 		bytes:          docxBytes,
 		reader:         docxReader,
@@ -80,12 +80,12 @@ func NewDocxTemplateFromFilename(docxFilename string) (*docxTemplate, error) {
 	}, nil
 }
 
-// Media adds a media file to the docxTemplate object.
+// Media adds a media file to the DocxTemplate object.
 // The media file will be included in the final DOCX output.
 // The filename should be the name of the file as it will appear in the DOCX media folder.
 // The data should be the byte content of the media file.
 // Supported media types are currently limited to JPEG and PNG images.
-func (dt *docxTemplate) Media(filename string, data []byte) {
+func (dt *DocxTemplate) Media(filename string, data []byte) {
 	dt.media = append(dt.media, docx.Media{
 		Filename: filename,
 		Data:     data,
@@ -94,7 +94,7 @@ func (dt *docxTemplate) Media(filename string, data []byte) {
 
 // Apply applies the template with the provided values to the DOCX file.
 // The templateValues parameter can be any type that can be marshalled to JSON.
-func (dt *docxTemplate) Apply(templateValues any) error {
+func (dt *DocxTemplate) Apply(templateValues any) error {
 	zipWriter := zip.NewWriter(&dt.output)
 
 	zipMap := make(utils.ZipMap)
@@ -333,8 +333,8 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 // Save iterates over filenames and write the output docx for the first non esistent file.
 // If a single filename string is provided, the file gets overwritten.
 // If no filenames are provided, it saves the file with a timestamp or the provided original filename
-// if the docxTemplate object was created with the NewDocxTemplateFromFilename function.
-func (dt *docxTemplate) Save(filenames ...string) error {
+// if the DocxTemplate object was created with the NewDocxTemplateFromFilename function.
+func (dt *DocxTemplate) Save(filenames ...string) error {
 	filename := fmt.Sprintf("output_%s", dt.outputFilename)
 	if dt.outputFilename == "" {
 		filename = fmt.Sprintf("output_%s.docx", time.Now().Format("20060102150405"))
@@ -356,6 +356,6 @@ func (dt *docxTemplate) Save(filenames ...string) error {
 
 // Bytes returns the output bytes of the output DOCX file bytes
 // (empty if Apply was not used).
-func (dt *docxTemplate) Bytes() []byte {
+func (dt *DocxTemplate) Bytes() []byte {
 	return dt.output.Bytes()
 }
