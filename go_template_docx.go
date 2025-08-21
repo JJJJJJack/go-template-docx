@@ -81,10 +81,10 @@ func NewDocxTemplateFromFilename(docxFilename string) (*DocxTemplate, error) {
 }
 
 // Media adds a media file to the DocxTemplate object.
-// The media file will be included in the final DOCX output.
-// The filename should be the name of the file as it will appear in the DOCX media folder.
-// The data should be the byte content of the media file.
 // Supported media types are currently limited to JPEG and PNG images.
+// The filename match the string you pass in the template expression using the "toImage" function.
+// as example {{ toImage "computer.png" }} will load the docx.Media that have "computer.png" as its filename.
+// The data should be the byte content of the media file.
 func (dt *DocxTemplate) Media(filename string, data []byte) {
 	dt.media = append(dt.media, docx.Media{
 		Filename: filename,
