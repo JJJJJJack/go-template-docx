@@ -93,7 +93,7 @@ Let's say we have this json value as our `templateValues` variable:
       "Icon": "windows.png"
     }
   ],
-  "Charts": [
+  "ClustCol": [
     { "Label": "Cat1", "Value": 111.11 },
     { "Label": "Cat2", "Value": 222 },
     { "Label": "Cat3", "Value": 333.33 },
