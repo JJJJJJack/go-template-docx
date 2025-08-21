@@ -2,12 +2,27 @@ package utils
 
 import (
 	"archive/zip"
+	"bytes"
 	"fmt"
 	"io"
 	"regexp"
 )
 
 type ZipMap map[string]*zip.File
+
+func NewZipMap(data []byte) (ZipMap, error) {
+	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create zip reader: %w", err)
+	}
+
+	zipMap := make(ZipMap)
+	for _, f := range r.File {
+		zipMap[f.Name] = f
+	}
+
+	return zipMap, nil
+}
 
 func CopyOriginalFile(f *zip.File, zipWriter *zip.Writer) error {
 	fileInZip, err := f.Open()

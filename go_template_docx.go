@@ -24,6 +24,7 @@ type DocxTemplate struct {
 	rel            *docx.Relationship
 	relMedia       []docx.MediaRel
 	media          []docx.Media
+	xlsxChartsMeta xlsxChartsMap
 }
 
 // NewDocxTemplateFromBytes creates a new DocxTemplate object from the provided DOCX file bytes.
@@ -47,6 +48,7 @@ func NewDocxTemplateFromBytes(docxBytes []byte) (*DocxTemplate, error) {
 		media:          []docx.Media{},
 		rel:            &docx.Relationship{},
 		relMedia:       []docx.MediaRel{},
+		xlsxChartsMeta: make(xlsxChartsMap),
 	}, nil
 }
 
@@ -77,13 +79,14 @@ func NewDocxTemplateFromFilename(docxFilename string) (*DocxTemplate, error) {
 		media:          []docx.Media{},
 		rel:            &docx.Relationship{},
 		relMedia:       []docx.MediaRel{},
+		xlsxChartsMeta: make(xlsxChartsMap),
 	}, nil
 }
 
 // Media adds a media file to the DocxTemplate object.
 // Supported media types are currently limited to JPEG and PNG images.
-// The filename match the string you pass in the template expression using the "toImage" function.
-// as example {{ toImage "computer.png" }} will load the docx.Media that have "computer.png" as its filename.
+// The filename match the string you pass in the template expression using the toImage function.
+// For example {{ toImage "computer.png" }} will load the docx.Media that have "computer.png" as its filename.
 // The data should be the byte content of the media file.
 func (dt *DocxTemplate) Media(filename string, data []byte) {
 	dt.media = append(dt.media, docx.Media{
@@ -97,12 +100,12 @@ func (dt *DocxTemplate) Media(filename string, data []byte) {
 func (dt *DocxTemplate) Apply(templateValues any) error {
 	zipWriter := zip.NewWriter(&dt.output)
 
-	zipMap := make(utils.ZipMap)
-	for _, f := range dt.reader.File {
-		zipMap[f.Name] = f
+	docxZipMap, err := utils.NewZipMap(dt.bytes)
+	if err != nil {
+		return fmt.Errorf("unable to create DOCX zip map: %w", err)
 	}
 
-	document, err := docx.ParseDocumentMeta(zipMap)
+	document, err := docx.ParseDocumentMeta(docxZipMap)
 	if err != nil {
 		return fmt.Errorf("unable to parse document metadata: %w", err)
 	}
@@ -131,7 +134,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 	}
 
 	// Edit [Content_Types].xml if media files are provided
-	ctFile := zipMap["[Content_Types].xml"]
+	ctFile := docxZipMap["[Content_Types].xml"]
 	ctData, err := utils.ReadZipFileContent(ctFile)
 	if err != nil {
 		return fmt.Errorf("unable to read content types file '%s': %w", ctFile.Name, err)
@@ -175,7 +178,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 		}
 	}
 
-	relData, err := utils.ReadZipFileContent(zipMap[documentRelsFilename])
+	relData, err := utils.ReadZipFileContent(docxZipMap[documentRelsFilename])
 	if err != nil {
 		return fmt.Errorf("unable to read rel file '%s': %w", documentRelsFilename, err)
 	}
@@ -189,7 +192,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 	chartRelToTargetXlsx := make(map[string]string)
 	for i := 1; ; i++ {
 		relsChartFilename := fmt.Sprintf("word/charts/_rels/chart%d.xml.rels", i)
-		f := zipMap[relsChartFilename]
+		f := docxZipMap[relsChartFilename]
 		if f == nil {
 			break
 		}
@@ -220,12 +223,12 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 		if i == 0 {
 			xlsxFilename = "word/embeddings/Microsoft_Excel_Worksheet.xlsx"
 		}
-		f := zipMap[xlsxFilename]
+		f := docxZipMap[xlsxFilename]
 		if f == nil {
 			break
 		}
 
-		err := xlsx.WriteXlsxIntoZip(f, zipWriter, templateValues)
+		err := dt.writeXlsxIntoZip(f, zipWriter, templateValues)
 		if err != nil {
 			return fmt.Errorf("unable to apply template to XLSX file '%s': %w", f.Name, err)
 		}
@@ -234,7 +237,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 	// Apply template to the header files
 	for i := 1; ; i++ {
 		headerFilename := fmt.Sprintf("word/header%d.xml", i)
-		f := zipMap[headerFilename]
+		f := docxZipMap[headerFilename]
 		if f == nil {
 			break
 		}
@@ -250,7 +253,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 	// Apply template to the footer files
 	for i := 1; ; i++ {
 		footerFilename := fmt.Sprintf("word/footer%d.xml", i)
-		f := zipMap[footerFilename]
+		f := docxZipMap[footerFilename]
 		if f == nil {
 			break
 		}
@@ -264,7 +267,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 	}
 
 	// Apply template to the main document file
-	documentFile := zipMap["word/document.xml"]
+	documentFile := docxZipMap["word/document.xml"]
 	if documentFile == nil {
 		return fmt.Errorf("word/document.xml not found in the DOCX file")
 	}
@@ -279,7 +282,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 	// Apply template to the chart files
 	for i := 1; ; i++ {
 		chartN := fmt.Sprintf("word/charts/chart%d.xml", i)
-		f := zipMap[chartN]
+		f := docxZipMap[chartN]
 		if f == nil {
 			break
 		}
@@ -295,7 +298,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 		}
 
 		xlsxFileTarget := chartRelToTargetXlsx[chartFilename]
-		fileContent, err = xlsx.UpdateChart(fileContent, xlsx.XlsxFiles[xlsxFileTarget].ChartNumbers)
+		fileContent, err = xlsx.UpdateChart(fileContent, dt.xlsxChartsMeta[xlsxFileTarget].chartNumbers)
 		if err != nil {
 			return fmt.Errorf("unable to update preview chart file '%s': %w", f.Name, err)
 		}
@@ -309,7 +312,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 	if len(dt.relMedia) != 0 {
 		dt.rel.AddMediaToRels(dt.relMedia)
 
-		documentRelFile := zipMap[documentRelsFilename]
+		documentRelFile := docxZipMap[documentRelsFilename]
 
 		xmlContent, err := dt.rel.ToXML()
 		if err != nil {

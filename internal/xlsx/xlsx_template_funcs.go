@@ -2,7 +2,7 @@ package xlsx
 
 import "fmt"
 
-func toNumberCell(v any) (interface{}, error) {
+func ToNumberCell(v any) (interface{}, error) {
 	switch v := v.(type) {
 	case
 		int, int8, int16, int32, int64,
@@ -11,5 +11,5 @@ func toNumberCell(v any) (interface{}, error) {
 		return fmt.Sprintf("[[NUMBER:%v]]", v), nil
 	}
 
-	return nil, fmt.Errorf("type %T not implemented in toNumberCell", v)
+	return nil, fmt.Errorf("type %T not implemented in ToNumberCell", v)
 }
