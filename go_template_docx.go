@@ -343,15 +343,12 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 	return nil
 }
 
-// Save iterates over filenames and write the output docx for the first non existent file.
-// If a single filename string is provided, the file gets overwritten.
-// If no filenames are provided, it saves the file with a timestamp or the provided original filename
-// if the DocxTemplate object was created with the NewDocxTemplateFromFilename function.
+// Save saves the modified docx file to the specified filename.
 func (dt *DocxTemplate) Save(filename string) error {
 	return os.WriteFile(filename, dt.output.Bytes(), 0644)
 }
 
-// Bytes returns the output bytes of the output DOCX file bytes
+// Bytes returns the output bytes of the output xlsx file bytes
 // (empty if Apply was not used).
 func (dt *DocxTemplate) Bytes() []byte {
 	return dt.output.Bytes()
