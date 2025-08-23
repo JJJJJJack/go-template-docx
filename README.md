@@ -51,8 +51,6 @@ if err != nil {
 
 ## 3. Saving the new docx as new file
 
-> for now it overrides an existing file only if the Save method receives a single string argument
-
 ```go
 err := DocxTemplate.Save(outputFilename)
 if err != nil {
