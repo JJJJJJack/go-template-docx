@@ -5,6 +5,7 @@
 output*
 report-template*
 *.exe
+dist/
 cmd/
 assets/
 makefile
