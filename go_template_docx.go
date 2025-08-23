@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -87,6 +88,8 @@ func NewDocxTemplateFromFilename(docxFilename string) (*DocxTemplate, error) {
 // For example {{ toImage "computer.png" }} will load the docx.Media that have "computer.png" as its filename.
 // The data should be the byte content of the media file.
 func (dt *DocxTemplate) Media(filename string, data []byte) {
+	filename = filepath.Base(filename)
+
 	dt.media = append(dt.media, docx.Media{
 		Filename: filename,
 		Data:     data,
