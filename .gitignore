@@ -7,3 +7,4 @@ report-template*
 *.exe
 cmd/
 assets/
+makefile
