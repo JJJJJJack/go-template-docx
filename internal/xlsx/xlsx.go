@@ -1,5 +1,14 @@
 package xlsx
 
+import (
+	"archive/zip"
+	"bytes"
+	"fmt"
+	"text/template"
+
+	"github.com/JJJJJJack/go-template-docx/internal/docx"
+)
+
 // import (
 // 	"archive/zip"
 // 	"bytes"
@@ -11,23 +20,24 @@ package xlsx
 // 	"github.com/JJJJJJack/go-template-docx/internal/utils"
 // )
 
-// func applyTemplateToCells(f *zip.File, templateValues any, fileContent []byte) ([]byte, error) {
-// 	tmpl, err := template.New(f.Name).
-// 		Funcs(template.FuncMap{
-// 			"toNumberCell": ToNumberCell,
-// 		}).
-// 		Parse(docx.PatchXml(string(fileContent)))
-// 	if err != nil {
-// 		return nil, fmt.Errorf("unable to parse template: %w", err)
-// 	}
+// ApplyTemplateToCells applies the templateValues to the given file content and returns the modified content.
+func ApplyTemplateToCells(f *zip.File, templateValues any, fileContent []byte) ([]byte, error) {
+	tmpl, err := template.New(f.Name).
+		Funcs(template.FuncMap{
+			"toNumberCell": ToNumberCell,
+		}).
+		Parse(docx.PatchXml(string(fileContent)))
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse template: %w", err)
+	}
 
-// 	var buf bytes.Buffer
-// 	if err := tmpl.Execute(&buf, templateValues); err != nil {
-// 		return nil, fmt.Errorf("unable to execute template: %w", err)
-// 	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, templateValues); err != nil {
+		return nil, fmt.Errorf("unable to execute template: %w", err)
+	}
 
-// 	return buf.Bytes(), nil
-// }
+	return buf.Bytes(), nil
+}
 
 // // ModifyXlsxInMemoryFromZipFile modifies an internal file inside an XLSX embedded in a zip.File.
 // // It returns a modified XLSX as []byte.
@@ -35,7 +45,7 @@ package xlsx
 // 	var sharedStringsNumbers map[int]string
 
 // 	// Read XLSX zip into memory
-// 	xlsxData, err := utils.ReadZipFileContent(xlsxFile)
+// 	xlsxData, err := goziputils.ReadZipFileContent(xlsxFile)
 // 	if err != nil {
 // 		return nil, fmt.Errorf("failed to read embedded XLSX file: %w", err)
 // 	}
@@ -45,7 +55,7 @@ package xlsx
 // 		return nil, fmt.Errorf("failed to open XLSX zip reader: %w", err)
 // 	}
 
-// 	xlsxZipMap := make(utils.ZipMap)
+// 	xlsxZipMap := make(goziputils.ZipMap)
 // 	for _, f := range xlsxReader.File {
 // 		xlsxZipMap[f.Name] = f
 // 	}
@@ -69,7 +79,7 @@ package xlsx
 // 			continue
 // 		}
 
-// 		fileContent, err := utils.ReadZipFileContent(f)
+// 		fileContent, err := goziputils.ReadZipFileContent(f)
 // 		if err != nil {
 // 			return nil, fmt.Errorf("error reading file '%s': %w", f.Name, err)
 // 		}
@@ -101,7 +111,7 @@ package xlsx
 // 			continue
 // 		}
 
-// 		fileContent, err := utils.ReadZipFileContent(f)
+// 		fileContent, err := goziputils.ReadZipFileContent(f)
 // 		if err != nil {
 // 			return nil, fmt.Errorf("error reading zip file content '%s': %w", f.Name, err)
 // 		}
@@ -148,7 +158,7 @@ package xlsx
 // 		return fmt.Errorf("error modifying XLSX in memory: %w", err)
 // 	}
 
-// 	err = utils.RewriteFileIntoZipWriter(f, docxZipWriter, xlsxBytes)
+// 	err = goziputils.RewriteFileIntoZipWriter(f, docxZipWriter, xlsxBytes)
 // 	if err != nil {
 // 		return fmt.Errorf("error creating entry in zip: %w", err)
 // 	}

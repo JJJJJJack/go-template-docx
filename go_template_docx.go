@@ -3,17 +3,15 @@ package gotemplatedocx
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/JJJJJJack/go-template-docx/internal/docx"
-	"github.com/JJJJJJack/go-template-docx/internal/file"
-	"github.com/JJJJJJack/go-template-docx/internal/utils"
-	"github.com/JJJJJJack/go-template-docx/internal/xlsx"
+	goziputils "github.com/JJJJJJack/go-zip-utils"
 )
 
 type DocxTemplate struct {
@@ -98,9 +96,17 @@ func (dt *DocxTemplate) Media(filename string, data []byte) {
 // Apply applies the template with the provided values to the DOCX file.
 // The templateValues parameter can be any type that can be marshalled to JSON.
 func (dt *DocxTemplate) Apply(templateValues any) error {
+	switch v := templateValues.(type) {
+	case []byte:
+		err := json.Unmarshal(v, &templateValues)
+		if err != nil {
+			return fmt.Errorf("error unmarshalling templateValues: %w", err)
+		}
+	}
+
 	zipWriter := zip.NewWriter(&dt.output)
 
-	docxZipMap, err := utils.NewZipMap(dt.bytes)
+	docxZipMap, err := goziputils.NewZipMapFromBytes(dt.bytes)
 	if err != nil {
 		return fmt.Errorf("unable to create DOCX zip map: %w", err)
 	}
@@ -116,18 +122,18 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 	chartsMatcher := regexp.MustCompile(`word/charts/chart\d*?\.xml`)
 	headerFooterDocumentMatcher := regexp.MustCompile(`word/(header|footer|document)\d*?\.xml`)
 	xlsxMatcher := regexp.MustCompile(`/embeddings/Microsoft_Excel_Worksheet\d*?\.xlsx`)
-	for _, f := range dt.reader.File {
+	for filename, f := range docxZipMap {
 		switch {
 		case
-			f.Name == documentRelsFilename,
-			f.Name == contentTypesFilename,
-			chartsMatcher.MatchString(f.Name),
-			xlsxMatcher.MatchString(f.Name),
-			headerFooterDocumentMatcher.MatchString(f.Name):
+			filename == documentRelsFilename,
+			filename == contentTypesFilename,
+			chartsMatcher.MatchString(filename),
+			xlsxMatcher.MatchString(filename),
+			headerFooterDocumentMatcher.MatchString(filename):
 			continue
 		}
 
-		err := utils.CopyOriginalFile(f, zipWriter)
+		err := goziputils.CopyFile(zipWriter, f)
 		if err != nil {
 			return fmt.Errorf("unable to copy original file '%s': %w", f.Name, err)
 		}
@@ -135,7 +141,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 
 	// Edit [Content_Types].xml if media files are provided
 	ctFile := docxZipMap["[Content_Types].xml"]
-	ctData, err := utils.ReadZipFileContent(ctFile)
+	ctData, err := goziputils.ReadZipFileContent(ctFile)
 	if err != nil {
 		return fmt.Errorf("unable to read content types file '%s': %w", ctFile.Name, err)
 	}
@@ -164,7 +170,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 		return fmt.Errorf("unable to marshal content types to XML: %w", err)
 	}
 
-	err = utils.ReplaceFileContent(ctFile, zipWriter, []byte(updatedCt))
+	err = goziputils.RewriteFileIntoZipWriter(zipWriter, ctFile, []byte(updatedCt))
 	if err != nil {
 		return fmt.Errorf("unable to replace content types file '%s': %w", ctFile.Name, err)
 	}
@@ -172,13 +178,13 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 	// Put loaded medias into the new docx file
 	for _, m := range dt.media {
 		filepath := path.Join("word/media", m.Filename)
-		err := utils.ZipWriteFile(filepath, zipWriter, m.Data)
+		err := goziputils.WriteFile(zipWriter, filepath, m.Data)
 		if err != nil {
 			return fmt.Errorf("unable to write media file '%s': %w", filepath, err)
 		}
 	}
 
-	relData, err := utils.ReadZipFileContent(docxZipMap[documentRelsFilename])
+	relData, err := goziputils.ReadZipFileContent(docxZipMap[documentRelsFilename])
 	if err != nil {
 		return fmt.Errorf("unable to read rel file '%s': %w", documentRelsFilename, err)
 	}
@@ -197,7 +203,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 			break
 		}
 
-		fileContent, err := utils.ReadZipFileContent(f)
+		fileContent, err := goziputils.ReadZipFileContent(f)
 		if err != nil {
 			return fmt.Errorf("unable to read chart rel file '%s': %w", f.Name, err)
 		}
@@ -209,7 +215,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 			}
 
 			targetXlsxFilename := strings.Replace(relationship.Target, "../", "word/", 1)
-			chartFilename, err := utils.ExtractChartFilename(f.Name)
+			chartFilename, err := docx.ExtractChartFilename(f.Name)
 			if err != nil {
 				return fmt.Errorf("unable to extract chart name from file '%s': %w", f.Name, err)
 			}
@@ -282,28 +288,29 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 	// Apply template to the chart files
 	for i := 1; ; i++ {
 		chartN := fmt.Sprintf("word/charts/chart%d.xml", i)
+
 		f := docxZipMap[chartN]
 		if f == nil {
 			break
 		}
 
-		fileContent, err := xlsx.ApplyTemplateToXml(f, templateValues)
+		fileContent, err := docx.ApplyTemplateToXml(f, templateValues)
 		if err != nil {
 			return fmt.Errorf("unable to apply template to chart file '%s': %w", f.Name, err)
 		}
 
-		chartFilename, err := utils.ExtractChartFilename(f.Name)
+		chartFilename, err := docx.ExtractChartFilename(f.Name)
 		if err != nil {
 			return fmt.Errorf("unable to extract chart name from file '%s': %w", f.Name, err)
 		}
 
 		xlsxFileTarget := chartRelToTargetXlsx[chartFilename]
-		fileContent, err = xlsx.UpdateChart(fileContent, dt.xlsxChartsMeta[xlsxFileTarget].chartNumbers)
+		fileContent, err = docx.UpdateChart(fileContent, dt.xlsxChartsMeta[xlsxFileTarget].chartNumbers)
 		if err != nil {
 			return fmt.Errorf("unable to update preview chart file '%s': %w", f.Name, err)
 		}
 
-		err = utils.RewriteFileIntoZipWriter(f, zipWriter, fileContent)
+		err = goziputils.RewriteFileIntoZipWriter(zipWriter, f, fileContent)
 		if err != nil {
 			return fmt.Errorf("unable to rewrite chart file '%s': %w", f.Name, err)
 		}
@@ -319,7 +326,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 			return fmt.Errorf("unable to marshal rels: %w", err)
 		}
 
-		err = utils.ReplaceFileContent(documentRelFile, zipWriter, []byte(xmlContent))
+		err = goziputils.RewriteFileIntoZipWriter(zipWriter, documentRelFile, []byte(xmlContent))
 		if err != nil {
 			return fmt.Errorf("unable to replace rel file '%s': %w", documentRelsFilename, err)
 		}
@@ -337,23 +344,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 // If a single filename string is provided, the file gets overwritten.
 // If no filenames are provided, it saves the file with a timestamp or the provided original filename
 // if the DocxTemplate object was created with the NewDocxTemplateFromFilename function.
-func (dt *DocxTemplate) Save(filenames ...string) error {
-	filename := fmt.Sprintf("output_%s", dt.outputFilename)
-	if dt.outputFilename == "" {
-		filename = fmt.Sprintf("output_%s.docx", time.Now().Format("20060102150405"))
-	}
-
-	if len(filenames) == 1 {
-		filename = filenames[0]
-	}
-	if len(filenames) > 1 {
-		var err error
-		filename, err = file.FindFirstMissingFile(filenames)
-		if err != nil {
-			fmt.Printf("The filenames provided seems to be already used, saving on '%s'\n", filename)
-		}
-	}
-
+func (dt *DocxTemplate) Save(filename string) error {
 	return os.WriteFile(filename, dt.output.Bytes(), 0644)
 }
 

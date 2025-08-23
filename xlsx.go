@@ -5,11 +5,9 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
-	"text/template"
 
-	"github.com/JJJJJJack/go-template-docx/internal/docx"
-	"github.com/JJJJJJack/go-template-docx/internal/utils"
 	"github.com/JJJJJJack/go-template-docx/internal/xlsx"
+	goziputils "github.com/JJJJJJack/go-zip-utils"
 )
 
 type chartData struct {
@@ -18,123 +16,113 @@ type chartData struct {
 
 type xlsxChartsMap map[string]chartData
 
-func applyTemplateToCells(f *zip.File, templateValues any, fileContent []byte) ([]byte, error) {
-	tmpl, err := template.New(f.Name).
-		Funcs(template.FuncMap{
-			"toNumberCell": xlsx.ToNumberCell,
-		}).
-		Parse(docx.PatchXml(string(fileContent)))
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse template: %w", err)
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, templateValues); err != nil {
-		return nil, fmt.Errorf("unable to execute template: %w", err)
-	}
-
-	return buf.Bytes(), nil
-}
-
 // modifyXlsxInMemoryFromZipFile modifies an internal file inside an XLSX embedded in a zip.File.
 // It returns a modified XLSX as []byte.
 func (dt *DocxTemplate) modifyXlsxInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]byte, error) {
 	var sharedStringsNumbers map[int]string
+	// key: old index, value: new index
+	var sharedStringsNewIndexes map[int]int
 
 	// Read XLSX zip into memory
-	xlsxData, err := utils.ReadZipFileContent(xlsxFile)
+	xlsxData, err := goziputils.ReadZipFileContent(xlsxFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read embedded XLSX file: %w", err)
 	}
 
-	_, err = utils.NewZipMap(xlsxData)
+	xlsxZipMap, err := goziputils.NewZipMapFromBytes(xlsxData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create XLSX zip map: %w", err)
-	}
-
-	// Create zip reader from in-memory XLSX data
-	r, err := zip.NewReader(bytes.NewReader(xlsxData), int64(len(xlsxData)))
-	if err != nil {
-		return nil, fmt.Errorf("failed to open XLSX zip reader: %w", err)
 	}
 
 	var buf bytes.Buffer
 	zipWriter := zip.NewWriter(&buf)
 
-	found := false
-
-	sharedStringsMatcher := regexp.MustCompile(`xl/(sharedStrings\d*)\.xml`)
+	// Copy all files except the ones that will be processed
 	sheetNMatcher := regexp.MustCompile(`xl/worksheets/sheet\d*\.xml`)
-	for _, f := range r.File {
-		// avoid processing chartN files for the next for-loop
-		if sheetNMatcher.MatchString(f.Name) {
+	sharedStringsMatcher := regexp.MustCompile(`xl/(sharedStrings\d*)\.xml`)
+	sharedStringsFilename := "xl/sharedStrings.xml"
+
+	for filename, f := range xlsxZipMap {
+		switch {
+		case
+			sheetNMatcher.MatchString(filename),
+			sharedStringsMatcher.MatchString(filename):
 			continue
 		}
 
-		fileContent, err := utils.ReadZipFileContent(f)
+		err := goziputils.CopyFile(zipWriter, f)
 		if err != nil {
-			return nil, fmt.Errorf("error reading file '%s': %w", f.Name, err)
-		}
-
-		w, err := zipWriter.CreateHeader(&f.FileHeader)
-		if err != nil {
-			return nil, fmt.Errorf("error creating file in zip: %w", err)
-		}
-
-		matchedSharedStrings := sharedStringsMatcher.MatchString(f.Name)
-		if matchedSharedStrings {
-			fileContent, err = applyTemplateToCells(f, templateValues, fileContent)
-			if err != nil {
-				return nil, fmt.Errorf("error applying template to file '%s': %w", f.Name, err)
-			}
-
-			found = true
-			fileContent, sharedStringsNumbers = xlsx.GetReferencedSharedStringsByIndexAndCleanup(fileContent)
-		}
-
-		if _, err := w.Write(fileContent); err != nil {
-			return nil, fmt.Errorf("error writing file '%s': %w", f.Name, err)
+			return nil, fmt.Errorf("unable to copy original embedding xlsx file '%s': %w", f.Name, err)
 		}
 	}
 
-	for _, f := range r.File {
-		// avoid processing other files again
-		if !sheetNMatcher.MatchString(f.Name) {
-			continue
+	// work on sharedStrings.xml
+	sharedStringsFile := xlsxZipMap[sharedStringsFilename]
+	if sharedStringsFile == nil {
+		return nil, fmt.Errorf("shared strings file '%s' not found in embedded XLSX", sharedStringsFilename)
+	}
+
+	sharedStringsContent, err := goziputils.ReadZipFileContent(sharedStringsFile)
+	if err != nil {
+		return nil, fmt.Errorf("error reading file '%s': %w", sharedStringsFile.Name, err)
+	}
+
+	sharedStringsContent, err = xlsx.ApplyTemplateToCells(sharedStringsFile, templateValues, sharedStringsContent)
+	if err != nil {
+		return nil, fmt.Errorf("error applying template to file '%s': %w", sharedStringsFile.Name, err)
+	}
+
+	sharedStringsContent, sharedStringsNumbers, sharedStringsNewIndexes, err = xlsx.GetReferencedSharedStringsByIndexAndCleanup(sharedStringsContent)
+	if err != nil {
+		return nil, fmt.Errorf("error cleaning up shared strings in file '%s': %w", sharedStringsFile.Name, err)
+	}
+
+	sharedStringsCount := uint(0)
+	for i := 1; ; i++ {
+		sheetN := fmt.Sprintf("xl/worksheets/sheet%d.xml", i)
+
+		f := xlsxZipMap[sheetN]
+		if f == nil {
+			break
 		}
 
-		fileContent, err := utils.ReadZipFileContent(f)
+		fileContent, err := goziputils.ReadZipFileContent(f)
 		if err != nil {
 			return nil, fmt.Errorf("error reading zip file content '%s': %w", f.Name, err)
 		}
 
-		w, err := zipWriter.CreateHeader(&f.FileHeader)
+		var chartValues []string
+		fileContent, chartValues, err = xlsx.UpdateSheet(fileContent, sharedStringsNumbers, sharedStringsNewIndexes)
 		if err != nil {
-			return nil, fmt.Errorf("error creating header file in zip: %w", err)
+			return nil, fmt.Errorf("error replacing shared strings indexes in file '%s': %w", f.Name, err)
 		}
 
-		matchedChartN := sheetNMatcher.MatchString(f.Name)
-		if matchedChartN {
-			var chartValues []string
-			fileContent, chartValues, err = xlsx.ReplaceSharedStringIndicesWithValues(fileContent, sharedStringsNumbers)
-			if err != nil {
-				return nil, fmt.Errorf("error replacing shared strings indexes in file '%s': %w", f.Name, err)
-			}
-
-			dt.xlsxChartsMeta[xlsxFile.Name] = chartData{
-				chartNumbers: chartValues,
-			}
-
-			found = true
+		dt.xlsxChartsMeta[xlsxFile.Name] = chartData{
+			chartNumbers: chartValues,
 		}
 
-		if _, err := w.Write(fileContent); err != nil {
+		sharedStringsRefs, err := xlsx.GetCountFromXml(fileContent)
+		if err != nil {
+			return nil, fmt.Errorf("error getting shared strings refs count from file '%s': %w", f.Name, err)
+		}
+
+		sharedStringsCount += sharedStringsRefs
+
+		err = goziputils.RewriteFileIntoZipWriter(zipWriter, f, fileContent)
+		if err != nil {
 			return nil, fmt.Errorf("error writing file '%s': %w", f.Name, err)
 		}
 	}
 
-	if !found {
-		return nil, fmt.Errorf("internal file '%s' not found in embedded XLSX", sharedStringsMatcher.String())
+	// need to be here, after all sheets have been processed we know the real count
+	sharedStringsContent, err = xlsx.RecountSharedStringsCountAndUniqueCountAttributes(sharedStringsContent, sharedStringsCount)
+	if err != nil {
+		return nil, fmt.Errorf("error recounting sharedStrings file '%s': %w", sharedStringsFile.Name, err)
+	}
+
+	err = goziputils.RewriteFileIntoZipWriter(zipWriter, sharedStringsFile, sharedStringsContent)
+	if err != nil {
+		return nil, fmt.Errorf("error writing sharedStrings file '%s': %w", sharedStringsFile.Name, err)
 	}
 
 	if err := zipWriter.Close(); err != nil {
@@ -150,7 +138,7 @@ func (dt *DocxTemplate) writeXlsxIntoZip(f *zip.File, docxZipWriter *zip.Writer,
 		return fmt.Errorf("error modifying XLSX in memory: %w", err)
 	}
 
-	err = utils.RewriteFileIntoZipWriter(f, docxZipWriter, xlsxBytes)
+	err = goziputils.RewriteFileIntoZipWriter(docxZipWriter, f, xlsxBytes)
 	if err != nil {
 		return fmt.Errorf("error creating entry in zip: %w", err)
 	}

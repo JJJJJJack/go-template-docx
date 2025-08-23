@@ -11,7 +11,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/JJJJJJack/go-template-docx/internal/utils"
+	goziputils "github.com/JJJJJJack/go-zip-utils"
 )
 
 type documentMeta struct {
@@ -74,7 +74,7 @@ func (d *documentMeta) NextRId() uint64 {
 }
 
 // TODO: use xml parsing instead of regex
-func ParseDocumentMeta(zm utils.ZipMap) (*documentMeta, error) {
+func ParseDocumentMeta(zm goziputils.ZipMap) (*documentMeta, error) {
 	d := documentMeta{}
 
 	// work on word/document.xml
@@ -84,7 +84,7 @@ func ParseDocumentMeta(zm utils.ZipMap) (*documentMeta, error) {
 		return nil, fmt.Errorf("word/document.xml not found in docx")
 	}
 
-	documentContent, err := utils.ReadZipFileContent(documentFile)
+	documentContent, err := goziputils.ReadZipFileContent(documentFile)
 	if err != nil {
 		return nil, fmt.Errorf("error reading zip file content: %w", err)
 	}
@@ -118,7 +118,7 @@ func ParseDocumentMeta(zm utils.ZipMap) (*documentMeta, error) {
 		return nil, fmt.Errorf("word/_rels/document.xml.rels not found in zip")
 	}
 
-	wordDocumentRelsContent, err := utils.ReadZipFileContent(wordDocumentRelsFile)
+	wordDocumentRelsContent, err := goziputils.ReadZipFileContent(wordDocumentRelsFile)
 	if err != nil {
 		return nil, fmt.Errorf("could not read zip file content: %w", err)
 	}
@@ -190,7 +190,7 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 }
 
 func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]MediaRel, error) {
-	documentXml, err := utils.ReadZipFileContent(f)
+	documentXml, err := goziputils.ReadZipFileContent(f)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read document file '%s': %w", f.Name, err)
 	}
@@ -219,7 +219,7 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 
 	output = postProcessing(output)
 
-	err = utils.RewriteFileIntoZipWriter(f, zipWriter, []byte(output))
+	err = goziputils.RewriteFileIntoZipWriter(zipWriter, f, []byte(output))
 	if err != nil {
 		return nil, fmt.Errorf("unable to rewrite file '%s' in zip: %w", f.Name, err)
 	}
