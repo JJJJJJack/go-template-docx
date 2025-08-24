@@ -7,6 +7,18 @@
 go-template-docx is based on the golang template standard library, thus it inherits its templating syntax to parse tokens inside the docx file.
 The library doesn't change the original files and only reads it into memory to output a new file with the provided template values.
 
+- supports go1.18+
+- based on the golang template library syntaxes with features such as:
+  - text replacement
+  - loops
+  - conditional statements
+  - array indexing
+  - nested structures/arrays
+- supports images (png|jpg)
+- supports embedded charts templating:
+  - the `toNumberCell` template function sets the chart cell a readbale number to make a graphically evaluable chart
+- supports tables templating
+
 # Usage
 
 First you need to create an instance of the object to load the docx file in and get the high-level APIs, you have 2 options to do so:
