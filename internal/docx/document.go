@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"text/template"
@@ -44,23 +43,30 @@ func (d *documentMeta) RandUniqueDocPrId() (uint32, error) {
 		d.docPrIdsBijectiveIndex = 1
 	}
 
-	docPrId := uint32(0)
+	nextDocPrId := uint32(0)
+findNextPrId:
 	for i := 0; ; i++ {
 		if i >= DOC_PR_ID_ROOF {
 			return 0, fmt.Errorf("this should not happen, surpassed %d attempts to create a unique id for a wp:docPr tag", DOC_PR_ID_ROOF)
 		}
 
-		docPrId = bijective32(d.docPrIdsBijectiveIndex) % DOC_PR_ID_ROOF
+		nextDocPrId = bijective32(d.docPrIdsBijectiveIndex) % DOC_PR_ID_ROOF
 		d.docPrIdsBijectiveIndex++
 
-		if !slices.Contains(d.docPrIds, docPrId) && docPrId != 0 {
+		for _, docPrId := range d.docPrIds {
+			if nextDocPrId == docPrId {
+				continue findNextPrId
+			}
+		}
+
+		if nextDocPrId != 0 {
 			break
 		}
 	}
 
-	d.docPrIds = append(d.docPrIds, docPrId)
+	d.docPrIds = append(d.docPrIds, nextDocPrId)
 
-	return docPrId, nil
+	return nextDocPrId, nil
 }
 
 func (d *documentMeta) NextPictureNumber() uint64 {
