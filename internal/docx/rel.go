@@ -38,17 +38,23 @@ func (r *Relationship) addRelationship(relType, target, id string) {
 		Target: target,
 		Id:     id,
 	}
+
 	r.Relationships = append(r.Relationships, newRel)
 }
 
-func (r *Relationship) ToXML() (string, error) {
+func (r *Relationship) ToXml() ([]byte, error) {
 	output, err := xml.MarshalIndent(r, "", "  ")
 	if err != nil {
-		return "", err
+		return []byte{}, err
 	}
 
-	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-	` + string(output), nil
+	header := []byte(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
+	xmlBytes := make([]byte, 0, len(header)+len(output))
+
+	xmlBytes = append(xmlBytes, header...)
+	xmlBytes = append(xmlBytes, output...)
+
+	return xmlBytes, nil
 }
 
 func ParseRelationship(data []byte) (*Relationship, error) {

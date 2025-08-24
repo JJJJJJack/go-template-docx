@@ -1,6 +1,7 @@
 package docx
 
 import (
+	"bytes"
 	"encoding/xml"
 )
 
@@ -43,11 +44,26 @@ func (ct *contentTypes) AddDefaultUnique(extension, contentType string) {
 	})
 }
 
-func (ct *contentTypes) ToXml() (string, error) {
+// replaceEmptyTags replaces specific XML empty tags patterns.
+func replaceEmptyTags(data []byte) []byte {
+	data = bytes.ReplaceAll(data, []byte("></Default>"), []byte(" />"))
+	data = bytes.ReplaceAll(data, []byte("></Override>"), []byte(" />"))
+	return data
+}
+
+func (ct *contentTypes) ToXml() ([]byte, error) {
 	output, err := xml.MarshalIndent(ct, "", "  ")
 	if err != nil {
-		return "", err
+		return []byte{}, err
 	}
 
-	return xml.Header + string(output), nil
+	output = replaceEmptyTags(output)
+
+	header := []byte(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
+	xmlBytes := make([]byte, 0, len(header)+len(output))
+
+	xmlBytes = append(xmlBytes, header...)
+	xmlBytes = append(xmlBytes, output...)
+
+	return xmlBytes, nil
 }

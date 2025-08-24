@@ -65,8 +65,8 @@ func GetReferencedSharedStringsByIndexAndCleanup(fileContent []byte) ([]byte, ma
 	return fileContent, numberCellsValues, stringsCellsNewIndexes, nil
 }
 
-// GetUniqueCountFromXML counts the number of <si> tags in sharedStrings.xml
-func GetUniqueCountFromXML(data []byte) (int, error) {
+// GetUniqueCountFromXml counts the number of <si> tags in sharedStrings.xml
+func GetUniqueCountFromXml(data []byte) (int, error) {
 	decoder := xml.NewDecoder(bytes.NewReader(data))
 
 	var sst SharedStrings
@@ -80,7 +80,7 @@ func GetUniqueCountFromXML(data []byte) (int, error) {
 // UpdateSharedStringsCounts updates the count and uniqueCount
 // attributes in sharedStrings.xml with previously obtained count and recalculated uniqueCount
 func UpdateSharedStringsCounts(sharedStringsContent []byte, count uint) ([]byte, error) {
-	uniqueCount, err := GetUniqueCountFromXML(sharedStringsContent)
+	uniqueCount, err := GetUniqueCountFromXml(sharedStringsContent)
 	if err != nil {
 		return nil, fmt.Errorf("error counting unique shared strings in sharedStrings.xml: %w", err)
 	}

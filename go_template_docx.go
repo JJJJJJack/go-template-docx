@@ -123,8 +123,8 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 	documentRelsFilename := "word/_rels/document.xml.rels"
 	contentTypesFilename := "[Content_Types].xml"
 	chartsMatcher := regexp.MustCompile(`word/charts/chart\d*?\.xml`)
-	headerFooterDocumentMatcher := regexp.MustCompile(`word/(header|footer|document)\d*?\.xml`)
 	xlsxMatcher := regexp.MustCompile(`/embeddings/Microsoft_Excel_Worksheet\d*?\.xlsx`)
+	headerFooterDocumentMatcher := regexp.MustCompile(`word/(header|footer|document)\d*?\.xml`)
 	for filename, f := range docxZipMap {
 		switch {
 		case
@@ -143,7 +143,7 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 	}
 
 	// Edit [Content_Types].xml if media files are provided
-	ctFile := docxZipMap["[Content_Types].xml"]
+	ctFile := docxZipMap[contentTypesFilename]
 	ctData, err := goziputils.ReadZipFileContent(ctFile)
 	if err != nil {
 		return fmt.Errorf("unable to read content types file '%s': %w", ctFile.Name, err)
@@ -319,20 +319,24 @@ func (dt *DocxTemplate) Apply(templateValues any) error {
 		}
 	}
 
+	documentRelFile := docxZipMap[documentRelsFilename]
+	documentRelContent, err := goziputils.ReadZipFileContent(documentRelFile)
+	if err != nil {
+		return fmt.Errorf("unable to read rel file '%s': %w", documentRelsFilename, err)
+	}
+
 	if len(dt.relMedia) != 0 {
 		dt.rel.AddMediaToRels(dt.relMedia)
 
-		documentRelFile := docxZipMap[documentRelsFilename]
-
-		xmlContent, err := dt.rel.ToXML()
+		documentRelContent, err = dt.rel.ToXml()
 		if err != nil {
 			return fmt.Errorf("unable to marshal rels: %w", err)
 		}
+	}
 
-		err = goziputils.RewriteFileIntoZipWriter(zipWriter, documentRelFile, []byte(xmlContent))
-		if err != nil {
-			return fmt.Errorf("unable to replace rel file '%s': %w", documentRelsFilename, err)
-		}
+	err = goziputils.RewriteFileIntoZipWriter(zipWriter, documentRelFile, documentRelContent)
+	if err != nil {
+		return fmt.Errorf("unable to replace rel file '%s': %w", documentRelsFilename, err)
 	}
 
 	err = zipWriter.Close()
