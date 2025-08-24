@@ -15,7 +15,7 @@ The library doesn't change the original files and only reads it into memory to o
   - array indexing
   - nested structures/arrays
 - supports images (png|jpg)
-- (needs fixes) supports embedded charts templating :
+- supports embedded charts templating:
   - the `toNumberCell` template function sets the chart cell a readbale number to make a graphically evaluable chart
 - supports tables templating
 
