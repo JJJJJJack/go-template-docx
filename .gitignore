@@ -9,4 +9,4 @@ dist/
 cmd/
 assets/
 makefile
-internal/mydebug
+internal/mydebug/
