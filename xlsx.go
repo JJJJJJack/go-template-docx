@@ -115,7 +115,7 @@ func (dt *DocxTemplate) modifyXlsxInMemoryFromZipFile(xlsxFile *zip.File, templa
 	}
 
 	// need to be here, after all sheets have been processed we know the real count
-	sharedStringsContent, err = xlsx.RecountSharedStringsCountAndUniqueCountAttributes(sharedStringsContent, sharedStringsCount)
+	sharedStringsContent, err = xlsx.UpdateSharedStringsCounts(sharedStringsContent, sharedStringsCount)
 	if err != nil {
 		return nil, fmt.Errorf("error recounting sharedStrings file '%s': %w", sharedStringsFile.Name, err)
 	}

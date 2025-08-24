@@ -77,9 +77,9 @@ func GetUniqueCountFromXML(data []byte) (int, error) {
 	return len(sst.SI), nil
 }
 
-// RecountSharedStringsCountAndUniqueCountAttributes updates the count and uniqueCount
+// UpdateSharedStringsCounts updates the count and uniqueCount
 // attributes in sharedStrings.xml with previously obtained count and recalculated uniqueCount
-func RecountSharedStringsCountAndUniqueCountAttributes(sharedStringsContent []byte, count uint) ([]byte, error) {
+func UpdateSharedStringsCounts(sharedStringsContent []byte, count uint) ([]byte, error) {
 	uniqueCount, err := GetUniqueCountFromXML(sharedStringsContent)
 	if err != nil {
 		return nil, fmt.Errorf("error counting unique shared strings in sharedStrings.xml: %w", err)
