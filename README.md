@@ -117,7 +117,70 @@ Let's say we have this json value as our `templateValues` variable:
   }
 }
 ```
-> these value types covers most of the common use cases
+
+or its Go struct equivalent:
+
+```go
+type TableRow struct {
+		Title string
+		Text  string
+		Icon  string
+}
+type ClustColRow struct {
+  Label string
+  Value float64
+}
+type PieChartData struct {
+  CriticalSum int
+  HighSum     int
+  MediumSum   int
+  LowSum      int
+}
+type TemplateValues struct {
+  A           string // returns errors if is used in template but not defined here
+  Title       string
+  Description string
+  Table       []TableRow
+  ClustCol    []ClustColRow
+  Pie         PieChartData
+}
+
+templateValues = TemplateValues{
+  A:           "test2",
+  Title:       "Asset Report",
+  Description: "Asset Report Description",
+  Table: []TableRow{
+    {
+      Title: "Try1",
+      Text:  "Text1",
+      Icon:  "computer.png",
+    },
+    {
+      Title: "Try2",
+      Text:  "Text2",
+      Icon:  "ap.png",
+    },
+    {
+      Title: "Try3",
+      Text:  "Text3",
+      Icon:  "windows.png",
+    },
+  },
+  ClustCol: []ClustColRow{
+    {Label: "Cat1", Value: 111.11},
+    {Label: "Cat2", Value: 222},
+    {Label: "Cat3", Value: 333.33},
+    {Label: "Cat4", Value: 444},
+  },
+  Pie: PieChartData{
+    CriticalSum: 10,
+    HighSum:     20,
+    MediumSum:   30,
+    LowSum:      40,
+  },
+}
+```
+> both are evaluated in the same way by the template, except for the `A` field that needs to be present in the struct to not return errors in the template, these value types covers most of the common use cases
 
 and this is the templated docx file that we load into the `DocxTemplate`:
 ![](https://github.com/JJJJJJack/jubilant-fortnight/blob/main/go-template-docx/docx-template-example.png)
