@@ -19,6 +19,12 @@ The library doesn't change the original files and only reads it into memory to o
   - the `toNumberCell` template function sets the chart cell a readable number to make a graphically evaluable chart
 - supports tables templating
 
+# Template functions list
+
+- ` toImage(filename string) `: the filename parameter looks for an equal loaded `Media`'s filename
+- `preserveNewline(text string)`: newlines are treated as `SHIFT + ENTER` input, thus keeping the text in the same paragraph.
+- `breakParagraph(s string)`: newlines are treated as `ENTER` input, thus creating a new paragraph for the sequent line.
+
 # Usage
 
 First you need to create an instance of the object to load the docx file in and get the high-level APIs, you have 2 options to do so:
