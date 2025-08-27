@@ -204,9 +204,7 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 	documentXml = []byte(PatchXml(string(documentXml)))
 
 	tmpl, err := template.New(f.Name).
-		Funcs(template.FuncMap{
-			"toImage": toImage,
-		}).
+		Funcs(templateFuncMap).
 		Parse(string(documentXml))
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse template in file '%s': %w", f.Name, err)
