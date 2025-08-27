@@ -138,21 +138,22 @@ const (
 	DOCX_BREAKPARAGRAPH_INJECT = "</w:t></w:r></w:p><w:p><w:r><w:t>"
 )
 
-func toImage(s string) string {
-	return fmt.Sprintf("[[IMAGE:%s]]", s)
+func toImage(filename string) string {
+	return fmt.Sprintf("[[IMAGE:%s]]", filename)
 }
 
-func toCenteredImage(s string) string {
-	return fmt.Sprintf("[[CENTERED_IMAGE:%s]]", s)
+func toCenteredImage(text string) string {
+	return fmt.Sprintf("[[CENTERED_IMAGE:%s]]", text)
 }
 
 // preserveNewline newlines are treated as `SHIFT + ENTER` input,
 // thus keeping the text in the same paragraph.
-func preserveNewline(s string) string {
-	return strings.ReplaceAll(s, "\n", DOCX_NEWLINE_INJECT)
+func preserveNewline(text string) string {
+	return strings.ReplaceAll(text, "\n", DOCX_NEWLINE_INJECT)
 }
 
-// breakParagraph replaces \n  with (Enter) input.
+// breakParagraph newlines are treated as `ENTER` input,
+// thus creating a new paragraph for the sequent line.
 func breakParagraph(s string) string {
 	return strings.ReplaceAll(s, "\n", DOCX_BREAKPARAGRAPH_INJECT)
 }
