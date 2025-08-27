@@ -2,6 +2,8 @@ package docx
 
 import (
 	"fmt"
+	"strings"
+	"text/template"
 )
 
 type XmlImageData struct {
@@ -131,10 +133,33 @@ const imageTemplateXml = `<w:drawing>
   </wp:inline>
 </w:drawing>`
 
+const (
+	DOCX_NEWLINE_INJECT        = "</w:t></w:r><w:r><w:br/></w:r><w:r><w:t>"
+	DOCX_BREAKPARAGRAPH_INJECT = "</w:t></w:r></w:p><w:p><w:r><w:t>"
+)
+
 func toImage(s string) string {
 	return fmt.Sprintf("[[IMAGE:%s]]", s)
 }
 
 func toCenteredImage(s string) string {
 	return fmt.Sprintf("[[CENTERED_IMAGE:%s]]", s)
+}
+
+// preserveNewline newlines are treated as `SHIFT + ENTER` input,
+// thus keeping the text in the same paragraph.
+func preserveNewline(s string) string {
+	return strings.ReplaceAll(s, "\n", DOCX_NEWLINE_INJECT)
+}
+
+// breakParagraph replaces \n  with (Enter) input.
+func breakParagraph(s string) string {
+	return strings.ReplaceAll(s, "\n", DOCX_BREAKPARAGRAPH_INJECT)
+}
+
+var templateFuncMap template.FuncMap = template.FuncMap{
+	"toImage": toImage,
+	// "toCenteredImage": toCenteredImage,
+	"preserveNewline": preserveNewline,
+	"breakParagraph":  breakParagraph,
 }
