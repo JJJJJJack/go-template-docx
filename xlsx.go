@@ -18,7 +18,7 @@ type xlsxChartsMap map[string]chartData
 
 // modifyXlsxInMemoryFromZipFile modifies an internal file inside an XLSX embedded in a zip.File.
 // It returns a modified XLSX as []byte.
-func (dt *DocxTemplate) modifyXlsxInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]byte, error) {
+func (dt *docxTemplate) modifyXlsxInMemoryFromZipFile(xlsxFile *zip.File, templateValues any) ([]byte, error) {
 	var sharedStringsNumbers map[int]string
 	// key: old index, value: new index
 	var sharedStringsNewIndexes map[int]int
@@ -132,7 +132,7 @@ func (dt *DocxTemplate) modifyXlsxInMemoryFromZipFile(xlsxFile *zip.File, templa
 	return buf.Bytes(), nil
 }
 
-func (dt *DocxTemplate) writeXlsxIntoZip(f *zip.File, docxZipWriter *zip.Writer, templateValues any) error {
+func (dt *docxTemplate) writeXlsxIntoZip(f *zip.File, docxZipWriter *zip.Writer, templateValues any) error {
 	xlsxBytes, err := dt.modifyXlsxInMemoryFromZipFile(f, templateValues)
 	if err != nil {
 		return fmt.Errorf("error modifying XLSX in memory: %w", err)
