@@ -147,3 +147,8 @@ func breakParagraph(s string) string {
 func shading(hex, s string) string {
 	return fmt.Sprintf(RGB_SHADING_WRAPPER_F, hex, s)
 }
+
+// shapeBgFillColor replace fillcolor to shapes
+func shapeBgFillColor(s string) string {
+	return fmt.Sprintf("[[SHAPE_BG_COLOR:%s]]", s)
+}
