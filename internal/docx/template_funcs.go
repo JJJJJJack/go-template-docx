@@ -143,6 +143,7 @@ func breakParagraph(s string) string {
 	return strings.ReplaceAll(s, "\n", DOCX_BREAKPARAGRAPH_INJECT)
 }
 
+// shading applies a background color to the given text
 func shading(hex, s string) string {
 	return fmt.Sprintf(RGB_SHADING_WRAPPER_F, hex, s)
 }
