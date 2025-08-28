@@ -22,7 +22,8 @@ type docxTemplate struct {
 	output         bytes.Buffer
 	rel            *docx.Relationship
 	relMedia       []docx.MediaRel
-	media          []docx.Media
+	// filename : data
+	media          docx.MediaMap
 	xlsxChartsMeta xlsxChartsMap
 }
 
@@ -44,7 +45,7 @@ func NewDocxTemplateFromBytes(docxBytes []byte) (*docxTemplate, error) {
 		bytes:          docxBytes,
 		reader:         docxReader,
 		output:         bytes.Buffer{},
-		media:          []docx.Media{},
+		media:          docx.MediaMap{},
 		rel:            &docx.Relationship{},
 		relMedia:       []docx.MediaRel{},
 		xlsxChartsMeta: make(xlsxChartsMap),
@@ -75,7 +76,7 @@ func NewDocxTemplateFromFilename(docxFilename string) (*docxTemplate, error) {
 		bytes:          docxBytes,
 		reader:         docxReader,
 		output:         bytes.Buffer{},
-		media:          []docx.Media{},
+		media:          make(docx.MediaMap),
 		rel:            &docx.Relationship{},
 		relMedia:       []docx.MediaRel{},
 		xlsxChartsMeta: make(xlsxChartsMap),
@@ -90,10 +91,7 @@ func NewDocxTemplateFromFilename(docxFilename string) (*docxTemplate, error) {
 func (dt *docxTemplate) Media(filename string, data []byte) {
 	filename = filepath.Base(filename)
 
-	dt.media = append(dt.media, docx.Media{
-		Filename: filename,
-		Data:     data,
-	})
+	dt.media[filename] = data
 }
 
 // Apply applies the template with the provided values to the DOCX file.
@@ -154,8 +152,8 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		return fmt.Errorf("unable to parse content types file '%s': %w", ctFile.Name, err)
 	}
 
-	for _, media := range dt.media {
-		ext := path.Ext(media.Filename)
+	for filename := range dt.media {
+		ext := path.Ext(filename)
 
 		switch strings.ToLower(ext) {
 		case ".jpg", ".jpeg", "jfif":
@@ -163,7 +161,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		case ".png":
 			contentTypes.AddDefaultUnique("png", "image/png")
 		default:
-			fmt.Println("Unsupported media file type (only accepting jpg/png for now):", media.Filename)
+			fmt.Println("Unsupported media file type (only accepting jpg/png for now):", filename)
 			continue
 		}
 	}
@@ -179,9 +177,9 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 	}
 
 	// Put loaded medias into the new docx file
-	for _, m := range dt.media {
-		filepath := path.Join("word/media", m.Filename)
-		err := goziputils.WriteFile(zipWriter, filepath, m.Data)
+	for filename, data := range dt.media {
+		filepath := path.Join("word/media", filename)
+		err := goziputils.WriteFile(zipWriter, filepath, data)
 		if err != nil {
 			return fmt.Errorf("unable to write media file '%s': %w", filepath, err)
 		}

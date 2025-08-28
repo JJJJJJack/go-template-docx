@@ -4,10 +4,7 @@ const (
 	ImageMediaType = iota + 1
 )
 
-type Media struct {
-	Filename string
-	Data     []byte
-}
+type MediaMap map[string][]byte
 
 type MediaRel struct {
 	Type   uint
