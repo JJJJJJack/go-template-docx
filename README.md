@@ -30,7 +30,7 @@ The library doesn't change the original files and only reads it into memory to o
 First you need to create an instance of the object to load the docx file in and get the high-level APIs, you have 2 options to do so:
 
 ```go
-DocxTemplate, err := gotemplatedocx.NewDocxTemplateFromBytes(docxBytes)
+docxTemplate, err := gotemplatedocx.NewDocxTemplateFromBytes(docxBytes)
 if err != nil {
   // handle error
 }
@@ -39,13 +39,13 @@ if err != nil {
 or
 
 ```go
-DocxTemplate, err := gotemplatedocx.NewDocxTemplateFromFilename(docxFilename)
+docxTemplate, err := gotemplatedocx.NewDocxTemplateFromFilename(docxFilename)
 if err != nil {
   // handle error
 }
 ```
 
-after obtaining the `DocxTemplate` object it exposes the methods to create a new docx file based on the original templated one, let's walk through the usage for each one
+after obtaining the `docxTemplate` object it exposes the methods to create a new docx file based on the original templated one, let's walk through the usage for each one
 
 > every function is provided with a Godoc comment, you can find all the exposed APIs in the `go_template_docx.go` file
 
@@ -53,7 +53,7 @@ after obtaining the `DocxTemplate` object it exposes the methods to create a new
 
 ```go
 myImagePngBytes, _ := os.ReadFile("myimage.png")
-DocxTemplate.Media("myimagealias.png", myImagePngBytes)
+docxTemplate.Media("myimagealias.png", myImagePngBytes)
 ```
 
 ## 2. Applying the template values
@@ -61,7 +61,7 @@ DocxTemplate.Media("myimagealias.png", myImagePngBytes)
 > here the `templateValues` variable could be any json marshallable value, the struct fields will be used as keys in the docx to search to access the value
 
 ```go
-err := DocxTemplate.Apply(templateValues)
+err := docxTemplate.Apply(templateValues)
 if err != nil {
   // handle error
 }
@@ -70,7 +70,7 @@ if err != nil {
 ## 3. Saving the new docx as new file
 
 ```go
-err := DocxTemplate.Save(outputFilename)
+err := docxTemplate.Save(outputFilename)
 if err != nil {
   // handle error
 }
@@ -79,7 +79,7 @@ if err != nil {
 ## 4. Read back bytes from new docx
 
 ```go
-output := DocxTemplate.Bytes()
+output := docxTemplate.Bytes()
 ```
 
 Enjoy programmatically templating docx files from golang!
@@ -188,7 +188,7 @@ templateValues = TemplateValues{
 ```
 > both are evaluated in the same way by the template, except for the `A` field that needs to be present in the struct to not return errors in the template, these value types covers most of the common use cases
 
-and this is the templated docx file that we load into the `DocxTemplate`:
+and this is the templated docx file that we load into the `docxTemplate`:
 ![](https://github.com/JJJJJJack/jubilant-fortnight/blob/main/go-template-docx/docx-template-example.png)
 
 with respectively the `Series 1` "Clustered Column" chart
