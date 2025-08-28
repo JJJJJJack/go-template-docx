@@ -26,13 +26,14 @@ func UpdateChart(fileContent []byte, values []string) ([]byte, error) {
 	return fileContent, nil
 }
 
-func ApplyTemplateToXml(f *zip.File, templateValues any) ([]byte, error) {
+func ApplyTemplateToXml(f *zip.File, templateValues any, templateFuncs template.FuncMap) ([]byte, error) {
 	fileContent, err := goziputils.ReadZipFileContent(f)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read chart file '%s': %w", f.Name, err)
 	}
 
 	tmpl, err := template.New(f.Name).
+		Funcs(templateFuncs).
 		Parse(PatchXml(string(fileContent)))
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse template: %w", err)

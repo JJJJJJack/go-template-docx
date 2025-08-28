@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"text/template"
 
 	"github.com/JJJJJJack/go-template-docx/internal/docx"
 	goziputils "github.com/JJJJJJack/go-zip-utils"
@@ -25,10 +26,11 @@ type docxTemplate struct {
 	// filename : data
 	media          docx.MediaMap
 	xlsxChartsMeta xlsxChartsMap
+	templateFuncs  template.FuncMap
 }
 
-// NewDocxTemplateFromBytes creates a new DocxTemplate object from the provided DOCX file bytes.
-// The DocxTemplate object can be used through the exposed high-level APIs.
+// NewDocxTemplateFromBytes creates a new docxTemplate object from the provided DOCX file bytes.
+// The docxTemplate object can be used through the exposed high-level APIs.
 func NewDocxTemplateFromBytes(docxBytes []byte) (*docxTemplate, error) {
 	bytesReader := bytes.NewReader(docxBytes)
 	if bytesReader == nil {
@@ -52,8 +54,8 @@ func NewDocxTemplateFromBytes(docxBytes []byte) (*docxTemplate, error) {
 	}, nil
 }
 
-// NewDocxTemplateFromFilename creates a new DocxTemplate object from the provided DOCX filename (reading from disk).
-// The DocxTemplate object can be used through the exposed high-level APIs.
+// NewDocxTemplateFromFilename creates a new docxTemplate object from the provided DOCX filename (reading from disk).
+// The docxTemplate object can be used through the exposed high-level APIs.
 func NewDocxTemplateFromFilename(docxFilename string) (*docxTemplate, error) {
 	docxBytes, err := os.ReadFile(docxFilename)
 	if err != nil {
@@ -83,7 +85,7 @@ func NewDocxTemplateFromFilename(docxFilename string) (*docxTemplate, error) {
 	}, nil
 }
 
-// Media adds a media file to the DocxTemplate object.
+// Media adds a media file to the docxTemplate object.
 // Supported media types are currently limited to JPEG and PNG images.
 // The filename match the string you pass in the template expression using the toImage function.
 // For example {{ toImage "computer.png" }} will load the docx.Media that have "computer.png" as its filename.
@@ -92,6 +94,12 @@ func (dt *docxTemplate) Media(filename string, data []byte) {
 	filename = filepath.Base(filename)
 
 	dt.media[filename] = data
+}
+
+// AddTemplateFuncs adds your custom template functions to evaluate when applying the template.
+// Existing functions will be overwritten if the same name is used.
+func (dt *docxTemplate) AddTemplateFuncs(funcMap template.FuncMap) {
+	dt.templateFuncs = funcMap
 }
 
 // Apply applies the template with the provided values to the DOCX file.
@@ -112,7 +120,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		return fmt.Errorf("unable to create DOCX zip map: %w", err)
 	}
 
-	document, err := docx.ParseDocumentMeta(docxZipMap)
+	document, err := docx.ParseDocumentMeta(docxZipMap, dt.templateFuncs)
 	if err != nil {
 		return fmt.Errorf("unable to parse document metadata: %w", err)
 	}
@@ -295,7 +303,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 			break
 		}
 
-		fileContent, err := docx.ApplyTemplateToXml(f, templateValues)
+		fileContent, err := docx.ApplyTemplateToXml(f, templateValues, dt.templateFuncs)
 		if err != nil {
 			return fmt.Errorf("unable to apply template to chart file '%s': %w", f.Name, err)
 		}

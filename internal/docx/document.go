@@ -21,6 +21,7 @@ type documentMeta struct {
 	// greaterWP14DocId       uint64
 	greaterPictureNumber uint64
 	// greaterChartNumber     uint64
+	templateFuncs template.FuncMap
 }
 
 const DOC_PR_ID_ROOF = 2_147_483_647 // docx id attributes are 32-bit signed integers
@@ -80,8 +81,19 @@ func (d *documentMeta) NextRId() uint64 {
 }
 
 // TODO: use xml parsing instead of regex
-func ParseDocumentMeta(zm goziputils.ZipMap) (*documentMeta, error) {
-	d := documentMeta{}
+func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap) (*documentMeta, error) {
+	d := documentMeta{
+		templateFuncs: template.FuncMap{
+			"toImage": toImage,
+			// "toCenteredImage": toCenteredImage,
+			"preserveNewline": preserveNewline,
+			"breakParagraph":  breakParagraph,
+		},
+	}
+
+	for funcName, fn := range tf {
+		d.templateFuncs[funcName] = fn
+	}
 
 	// work on word/document.xml
 
@@ -137,6 +149,7 @@ func ParseDocumentMeta(zm goziputils.ZipMap) (*documentMeta, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not parse rId '%s': %w", match[1], err)
 		}
+
 		if num > d.greaterRId {
 			d.greaterRId = num
 		}
@@ -151,11 +164,6 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 	imagePlaceholderRE := regexp.MustCompile(`\[\[IMAGE:.*?\]\]`)
 	xmlBlocks := imagePlaceholderRE.FindAllString(srcXML, -1)
 	for _, xmlBlock := range xmlBlocks {
-		imageTemplate, err := template.New("image-template").Parse(imageTemplateXml)
-		if err != nil {
-			return srcXML, mediaList, err
-		}
-
 		filename := strings.TrimPrefix(xmlBlock, "[[IMAGE:")
 		filename = strings.TrimSuffix(filename, "]]")
 
@@ -167,6 +175,11 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 
 		rid := d.NextRId()
 		rId := fmt.Sprintf("rId%d", rid)
+
+		imageTemplate, err := template.New("image-template").Parse(imageTemplateXml)
+		if err != nil {
+			return srcXML, mediaList, err
+		}
 
 		err = imageTemplate.Execute(&buffer, XmlImageData{
 			DocPrId: docPrId,
@@ -198,7 +211,7 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 	documentXml = []byte(PatchXml(string(documentXml)))
 
 	tmpl, err := template.New(f.Name).
-		Funcs(templateFuncMap).
+		Funcs(d.templateFuncs).
 		Parse(string(documentXml))
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse template in file '%s': %w", f.Name, err)

@@ -3,7 +3,6 @@ package docx
 import (
 	"fmt"
 	"strings"
-	"text/template"
 )
 
 type XmlImageData struct {
@@ -156,11 +155,4 @@ func preserveNewline(text string) string {
 // thus creating a new paragraph for the sequent line.
 func breakParagraph(s string) string {
 	return strings.ReplaceAll(s, "\n", DOCX_BREAKPARAGRAPH_INJECT)
-}
-
-var templateFuncMap template.FuncMap = template.FuncMap{
-	"toImage": toImage,
-	// "toCenteredImage": toCenteredImage,
-	"preserveNewline": preserveNewline,
-	"breakParagraph":  breakParagraph,
 }
