@@ -32,9 +32,9 @@ func rotl32(x uint32, k uint) uint32 {
 
 // bijective32 is a fast bijective permutation on 32-bit integers.
 func bijective32(x uint32) uint32 {
-	x *= 0x9E3779B1 // example odd 32-bit multiplier
+	x *= 0x9E3779B1
 	x = rotl32(x, 16)
-	x ^= 0x85EBCA6B // example 32-bit xor constant
+	x ^= 0x85EBCA6B
 	return x
 }
 
