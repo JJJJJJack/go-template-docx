@@ -16,11 +16,11 @@ import (
 type documentMeta struct {
 	docPrIdsBijectiveIndex uint32
 	docPrIds               []uint32
-	greaterCNvPrId         uint64
-	greaterRId             uint64
-	greaterWP14DocId       uint64
-	greaterPictureNumber   uint64
-	greaterChartNumber     uint64
+	// greaterCNvPrId         uint64
+	greaterRId uint64
+	// greaterWP14DocId       uint64
+	greaterPictureNumber uint64
+	// greaterChartNumber     uint64
 }
 
 const DOC_PR_ID_ROOF = 2_147_483_647 // docx id attributes are 32-bit signed integers
@@ -148,21 +148,15 @@ func ParseDocumentMeta(zm goziputils.ZipMap) (*documentMeta, error) {
 func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 	mediaList := []MediaRel{}
 
-	re := regexp.MustCompile(`<w:[A-Za-z]?>\[\[IMAGE:.*?\]\]</w:[A-Za-z]>`)
 	imagePlaceholderRE := regexp.MustCompile(`\[\[IMAGE:.*?\]\]`)
-	xmlBlocks := re.FindAllString(srcXML, -1)
+	xmlBlocks := imagePlaceholderRE.FindAllString(srcXML, -1)
 	for _, xmlBlock := range xmlBlocks {
 		imageTemplate, err := template.New("image-template").Parse(imageTemplateXml)
 		if err != nil {
 			return srcXML, mediaList, err
 		}
 
-		imageDirections := imagePlaceholderRE.FindAllString(xmlBlock, -1)
-		if len(imageDirections) < 1 {
-			continue
-		}
-
-		filename := strings.TrimPrefix(imageDirections[0], "[[IMAGE:")
+		filename := strings.TrimPrefix(xmlBlock, "[[IMAGE:")
 		filename = strings.TrimSuffix(filename, "]]")
 
 		buffer := bytes.Buffer{}
