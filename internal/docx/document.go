@@ -88,6 +88,7 @@ func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap) (*documentMeta
 			// "toCenteredImage": toCenteredImage,
 			"preserveNewline": preserveNewline,
 			"breakParagraph":  breakParagraph,
+			"shading":         shading,
 		},
 	}
 

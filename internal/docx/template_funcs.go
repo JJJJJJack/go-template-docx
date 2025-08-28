@@ -81,21 +81,6 @@ const imageCenterTemplateXml = `<w:p w14:paraId="4E9843FD" w14:textId="77777777"
     </w:p>
 		`
 
-const imageCaptionTemplateXml = `<w:p w14:paraId="1F0BA56D" w14:textId="39A991DB" w:rsidR="00F55C40" w:rsidRDefault="00963E01"
-      w:rsidP="00963E01">
-      <w:pPr>
-        <w:pStyle w:val="Caption" />
-        <w:jc w:val="center" />
-        <w:rPr>
-          <w:rFonts w:eastAsia="Calibri" />
-          <w:u w:val="single" />
-        </w:rPr>
-      </w:pPr>
-      <w:r>
-        <w:t>{{.Caption}}</w:t>
-      </w:r>
-    </w:p>`
-
 const imageTemplateXml = `<w:drawing>
   <wp:inline distT="0" distB="0" distL="0" distR="0"
     xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
@@ -135,24 +120,29 @@ const imageTemplateXml = `<w:drawing>
 const (
 	DOCX_NEWLINE_INJECT        = "</w:t></w:r><w:r><w:br/></w:r><w:r><w:t>"
 	DOCX_BREAKPARAGRAPH_INJECT = "</w:t></w:r></w:p><w:p><w:r><w:t>"
+	RGB_SHADING_WRAPPER_F      = `<w:r><w:rPr><w:shd w:val="clear" w:color="auto" w:fill="%s"/></w:rPr><w:t>%s</w:t></w:r>`
 )
 
 func toImage(filename string) string {
 	return fmt.Sprintf("[[IMAGE:%s]]", filename)
 }
 
-func toCenteredImage(text string) string {
-	return fmt.Sprintf("[[CENTERED_IMAGE:%s]]", text)
+func toCenteredImage(s string) string {
+	return fmt.Sprintf("[[CENTERED_IMAGE:%s]]", s)
 }
 
 // preserveNewline newlines are treated as `SHIFT + ENTER` input,
 // thus keeping the text in the same paragraph.
-func preserveNewline(text string) string {
-	return strings.ReplaceAll(text, "\n", DOCX_NEWLINE_INJECT)
+func preserveNewline(s string) string {
+	return strings.ReplaceAll(s, "\n", DOCX_NEWLINE_INJECT)
 }
 
 // breakParagraph newlines are treated as `ENTER` input,
 // thus creating a new paragraph for the sequent line.
 func breakParagraph(s string) string {
 	return strings.ReplaceAll(s, "\n", DOCX_BREAKPARAGRAPH_INJECT)
+}
+
+func shading(hex, s string) string {
+	return fmt.Sprintf(RGB_SHADING_WRAPPER_F, hex, s)
 }
