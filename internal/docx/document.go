@@ -84,7 +84,7 @@ func (d *documentMeta) NextRId() uint64 {
 func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap) (*documentMeta, error) {
 	d := documentMeta{
 		templateFuncs: template.FuncMap{
-			"toImage": toImage,
+			"image": image,
 			// "toCenteredImage": toCenteredImage,
 			"preserveNewline": preserveNewline,
 			"breakParagraph":  breakParagraph,

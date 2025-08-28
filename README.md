@@ -21,7 +21,7 @@ The library doesn't change the original files and only reads it into memory to o
 
 # Template functions list
 
-- ` toImage(filename string) `: the filename parameter looks for an equal loaded `Media`'s filename
+- `image(filename string)`: the filename parameter looks for an equal loaded `Media`'s filename
 - `preserveNewline(text string)`: newlines are treated as `SHIFT + ENTER` input, thus keeping the text in the same paragraph.
 - `breakParagraph(s string)`: newlines are treated as `ENTER` input, thus creating a new paragraph for the sequent line.
 
@@ -236,7 +236,7 @@ now let's walk a into each of the template instructions used in the docx file...
 - `{{range .Table}}` -> iterates over the `Table` field which contains an array, for each item in the array it replaces the fields inside the loop
 - `{{.Title}}` -> `Try1`, `Try2`, `Try3`
 - `{{.Text}}` -> `Text1`, `Text2`, `Text3`
-- `{{toImage .Icon}}` -> looks for the media filenames `"computer.png"`, `"ap.png"`, `"windows.png"` loaded through `template.Media(...)` and puts media reference in place
+- `{{image .Icon}}` -> looks for the media filenames `"computer.png"`, `"ap.png"`, `"windows.png"` loaded through `template.Media(...)` and puts media reference in place
 
 ### 4. Indexing array items (Series 1 chart)
 - `{{(index .ClustCol 0).Label}}` -> `Cat1`
