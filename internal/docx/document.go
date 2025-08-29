@@ -216,7 +216,6 @@ func (d *documentMeta) replaceImages(srcXML string) (string, []MediaRel, error) 
 
 	result := anchorRe.ReplaceAllStringFunc(srcXML, func(block string) string {
 		pm := placeholderRe.FindStringSubmatch(block)
-		fmt.Println("block", block)
 		if len(pm) < 2 {
 			return block
 		}
