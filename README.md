@@ -23,6 +23,8 @@ The library doesn't change the original files and only reads it into memory to o
 
 - `image(filename string)`: the filename parameter looks for an equal loaded `Media`'s filename
 > `{{image .ImageFilename}}`
+- `replaceImage(filename string)`: the filename parameter looks for an equal loaded `Media`'s filename, it replaces the image inside a `<w:drawing>...</w:drawing>` block, useful to keep the image size and position
+> `{{replaceImage .ImageFilename}}` inside the `AltText` of the image to replace
 - `preserveNewline(text string)`: newlines are treated as `SHIFT + ENTER` input, thus keeping the text in the same paragraph.
 > `{{preserveNewline .TextWithNewlines}}`
 - `breakParagraph(s string)`: newlines are treated as `ENTER` input, thus creating a new paragraph for the sequent line.
@@ -31,7 +33,6 @@ The library doesn't change the original files and only reads it into memory to o
 > `{{shadeTextBg .TextBgHex .Text}}`
 - `shapeBgFillColor(hex string)`: changes the shape's background fill color, hex string must be in the format `RRGGBB` or `#RRGGBB` and the shape must already have a fill color applied to work
 > `{{shapeBgFillColor .ShapeBgHex}}` inside the shape's text
-
 # Usage
 
 First you need to create an instance of the object to load the docx file in and get the high-level APIs, you have 2 options to do so:
