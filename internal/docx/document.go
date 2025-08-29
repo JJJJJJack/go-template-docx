@@ -88,7 +88,7 @@ func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap) (*documentMeta
 			// "toCenteredImage": toCenteredImage,
 			"preserveNewline":  preserveNewline,
 			"breakParagraph":   breakParagraph,
-			"shading":          shading,
+			"shadeTextBg":      shadeTextBg,
 			"shapeBgFillColor": shapeBgFillColor,
 		},
 	}
@@ -204,28 +204,27 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 	return srcXML, mediaList, nil
 }
 
-// ReplaceAllShapeBgColors finds shapes that contain [[SHAPE_BG_COLOR:XXXXXX]],
-// sets their fillcolor to #XXXXXX on the opening <v:...> tag, and
-// removes the placeholder text. It supports multiple shapes/placeholders.
+// ReplaceAllShapeBgColors finds shapes that contain the [[SHAPE_BG_COLOR:RRGGBB]]/[[SHAPE_BG_COLOR:#RRGGBB]]
+// placeholder and uses its value to replace the fillcolor attribute of the shape
 // TODO: replace with proper XML parsing
 func (d *documentMeta) applyShapesBgFillColor(srcXML string) (string, error) {
-	// Match entire shape blocks without using backreferences
 	shapeBlockRe := regexp.MustCompile(`(?s)<v:(?:shape|rect|roundrect|oval|line|polyline|arc|curve)\b[^>]*>.*?</v:(?:shape|rect|roundrect|oval|line|polyline|arc|curve)>`)
 
-	placeholderRe := regexp.MustCompile(`\[\[SHAPE_BG_COLOR:([0-9A-Fa-f]{6})\]\]`)
+	placeholderRe := regexp.MustCompile(`\[\[SHAPE_BG_COLOR:#?([0-9A-Fa-f]{6})\]\]`)
 
 	result := shapeBlockRe.ReplaceAllStringFunc(srcXML, func(block string) string {
-		// Is there a placeholder in this shape?
 		pm := placeholderRe.FindStringSubmatch(block)
 		if len(pm) < 2 {
-			return block // no placeholder → leave shape as-is
+			return block
 		}
-		hex := strings.ToUpper(pm[1])
 
-		// Remove all placeholders in this shape
+		hex := strings.ToUpper(pm[1])
+		if !strings.HasPrefix(hex, "#") {
+			hex = "#" + hex
+		}
+
 		block = placeholderRe.ReplaceAllString(block, "")
 
-		// Grab the opening tag only
 		startTagRe := regexp.MustCompile(`(?s)^<v:(?:roundrect|rect|shape)\b[^>]*>`)
 		startTag := startTagRe.FindString(block)
 		if startTag == "" {
@@ -233,12 +232,11 @@ func (d *documentMeta) applyShapesBgFillColor(srcXML string) (string, error) {
 		}
 		rest := block[len(startTag):]
 
-		// Replace existing fillcolor=... or insert if missing
 		fillAttrRe := regexp.MustCompile(`\bfillcolor="[^"]*"`)
 		if fillAttrRe.MatchString(startTag) {
-			startTag = fillAttrRe.ReplaceAllString(startTag, `fillcolor="#`+hex+`"`)
+			startTag = fillAttrRe.ReplaceAllString(startTag, `fillcolor="`+hex+`"`)
 		} else {
-			startTag = strings.Replace(startTag, ">", ` fillcolor="#`+hex+`">`, 1)
+			startTag = strings.Replace(startTag, ">", ` fillcolor="`+hex+`">`, 1)
 		}
 
 		return startTag + rest
