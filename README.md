@@ -22,8 +22,15 @@ The library doesn't change the original files and only reads it into memory to o
 # Template functions list
 
 - `image(filename string)`: the filename parameter looks for an equal loaded `Media`'s filename
+> `{{image .ImageFilename}}`
 - `preserveNewline(text string)`: newlines are treated as `SHIFT + ENTER` input, thus keeping the text in the same paragraph.
+> `{{preserveNewline .TextWithNewlines}}`
 - `breakParagraph(s string)`: newlines are treated as `ENTER` input, thus creating a new paragraph for the sequent line.
+> `{{breakParagraph .TextWithNewlines}}`
+- `shadeTextBg(hex string, s string)`: applies a background color to the given text, hex string must be in the format `RRGGBB` or `#RRGGBB`
+> `{{shadeTextBg .TextBgHex .Text}}`
+- `shapeBgFillColor(hex string)`: changes the shape's background fill color, hex string must be in the format `RRGGBB` or `#RRGGBB` and the shape must already have a fill color applied to work
+> `{{shapeBgFillColor .ShapeBgHex}}` inside the shape's text
 
 # Usage
 
