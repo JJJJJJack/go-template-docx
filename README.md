@@ -6,6 +6,7 @@
 
 go-template-docx is based on the golang template standard library, thus it inherits its templating syntax to parse tokens inside the docx file.
 The library doesn't change the original files and only reads it into memory to output a new file with the provided template values.
+> I'll make a good documentation website asap
 
 - supports go1.18+
 - based on the golang template library syntaxes with features such as:
@@ -14,10 +15,16 @@ The library doesn't change the original files and only reads it into memory to o
   - conditional statements
   - array indexing
   - nested structures/arrays
+  - supports adding your own custom template functions
 - supports images (png|jpg)
+  - the `image` template function places an image in the docx file
+  - the `replaceImage` template function replaces an existing image in the docx file, useful to keep the image size, position, style and other properties
 - supports embedded charts templating:
   - the `toNumberCell` template function sets the chart cell a readable number to make a graphically evaluable chart
 - supports tables templating
+- supports shapes
+  - the `shapeBgFillColor` template function changes the shape background fill color (first you need to set a fill color to the shape in the docx template)
+- supports preserving text formatting (color, bold, italic, font size, etc...) when replacing text
 
 # Template functions list
 
@@ -33,6 +40,8 @@ The library doesn't change the original files and only reads it into memory to o
 > `{{shadeTextBg .TextBgHex .Text}}`
 - `shapeBgFillColor(hex string)`: changes the shape's background fill color, hex string must be in the format `RRGGBB` or `#RRGGBB` and the shape must already have a fill color applied to work
 > `{{shapeBgFillColor .ShapeBgHex}}` inside the shape's text
+- `toNumberCell(v any)`: (for excel sheets, like charts) sets the cell type to number, useful to make charts work properly, v can be any type that can be converted to a float64
+
 # Usage
 
 First you need to create an instance of the object to load the docx file in and get the high-level APIs, you have 2 options to do so:
@@ -64,7 +73,15 @@ myImagePngBytes, _ := os.ReadFile("myimage.png")
 docxTemplate.Media("myimagealias.png", myImagePngBytes)
 ```
 
-## 2. Applying the template values
+## 2. Adding your custom template functions
+```go
+docxTemplate.AddTemplateFuncs("appendHeart", func(s string) string {
+  return s + " <3"
+})
+```
+> now you can use `{{ appendHeart .Text }}` in the docx template to append a heart to the value of `Text`, note that this is one of many possible function prototypes that template.FuncMap supports, full doc on https://pkg.go.dev/text/template#FuncMap
+
+## 3. Applying the template values
 
 > here the `templateValues` variable could be any json marshallable value, the struct fields will be used as keys in the docx to search to access the value
 
@@ -75,7 +92,7 @@ if err != nil {
 }
 ```
 
-## 3. Saving the new docx as new file
+## 4. Saving the new docx as new file
 
 ```go
 err := docxTemplate.Save(outputFilename)
@@ -84,7 +101,7 @@ if err != nil {
 }
 ```
 
-## 4. Read back bytes from new docx
+## 5. Read back bytes from new docx
 
 ```go
 output := docxTemplate.Bytes()
