@@ -84,7 +84,8 @@ func (d *documentMeta) NextRId() uint64 {
 func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap) (*documentMeta, error) {
 	d := documentMeta{
 		templateFuncs: template.FuncMap{
-			"image": image,
+			"image":        image,
+			"replaceImage": replaceImage,
 			// "toCenteredImage": toCenteredImage,
 			"preserveNewline":  preserveNewline,
 			"breakParagraph":   breakParagraph,
@@ -161,7 +162,7 @@ func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap) (*documentMeta
 }
 
 func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
-	mediaList := []MediaRel{}
+	mediaRels := []MediaRel{}
 
 	imagePlaceholderRE := regexp.MustCompile(`\[\[IMAGE:.*?\]\]`)
 	xmlBlocks := imagePlaceholderRE.FindAllString(srcXML, -1)
@@ -172,7 +173,7 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 		buffer := bytes.Buffer{}
 		docPrId, err := d.RandUniqueDocPrId()
 		if err != nil {
-			return srcXML, mediaList, fmt.Errorf("unable to get unique docPrId: %w", err)
+			return srcXML, mediaRels, fmt.Errorf("unable to get unique docPrId: %w", err)
 		}
 
 		rid := d.NextRId()
@@ -180,7 +181,7 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 
 		imageTemplate, err := template.New("image-template").Parse(imageTemplateXml)
 		if err != nil {
-			return srcXML, mediaList, err
+			return srcXML, mediaRels, err
 		}
 
 		err = imageTemplate.Execute(&buffer, XmlImageData{
@@ -189,10 +190,10 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 			RefID:   rId,
 		})
 		if err != nil {
-			return srcXML, mediaList, fmt.Errorf("unable to execute image template: %w", err)
+			return srcXML, mediaRels, fmt.Errorf("unable to execute image template: %w", err)
 		}
 
-		mediaList = append(mediaList, MediaRel{
+		mediaRels = append(mediaRels, MediaRel{
 			Type:   ImageMediaType,
 			RefID:  rId,
 			Source: path.Join("media", filename),
@@ -201,7 +202,43 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 		srcXML = strings.ReplaceAll(srcXML, xmlBlock, buffer.String())
 	}
 
-	return srcXML, mediaList, nil
+	return srcXML, mediaRels, nil
+}
+
+// replaceImages looks for [[REPLACE_IMAGE:filename.ext]] placeholders inside <w:drawing>...</w:drawing> blocks
+// remove the placeholder and replaces the image reference inside the block with the given image's rId.
+func (d *documentMeta) replaceImages(srcXML string) (string, []MediaRel, error) {
+	anchorRe := regexp.MustCompile(`(?s)<w:drawing>.*?</w:drawing>`)
+	placeholderRe := regexp.MustCompile(`\[\[REPLACE_IMAGE:([^\]]+)\]\]`)
+	blipRe := regexp.MustCompile(`(<a:blip\s+r:embed=")[^"]*(")`)
+
+	mediaRels := []MediaRel{}
+
+	result := anchorRe.ReplaceAllStringFunc(srcXML, func(block string) string {
+		pm := placeholderRe.FindStringSubmatch(block)
+		fmt.Println("block", block)
+		if len(pm) < 2 {
+			return block
+		}
+		filename := pm[1]
+
+		block = placeholderRe.ReplaceAllString(block, "")
+
+		rid := d.NextRId()
+		rId := fmt.Sprintf("rId%d", rid)
+
+		mediaRels = append(mediaRels, MediaRel{
+			Type:   ImageMediaType,
+			RefID:  rId,
+			Source: path.Join("media", filename),
+		})
+
+		block = blipRe.ReplaceAllString(block, "${1}"+rId+"${2}")
+
+		return block
+	})
+
+	return result, mediaRels, nil
 }
 
 // ReplaceAllShapeBgColors finds shapes that contain the [[SHAPE_BG_COLOR:RRGGBB]]/[[SHAPE_BG_COLOR:#RRGGBB]]
@@ -270,6 +307,12 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 	if err != nil {
 		return nil, fmt.Errorf("unable to apply images in file '%s': %w", f.Name, err)
 	}
+
+	output, replaceMedia, err := d.replaceImages(output)
+	if err != nil {
+		return nil, fmt.Errorf("unable to replace images in file '%s': %w", f.Name, err)
+	}
+	media = append(media, replaceMedia...)
 
 	output, err = d.applyShapesBgFillColor(output)
 	if err != nil {

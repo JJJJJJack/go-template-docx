@@ -127,6 +127,10 @@ func image(filename string) string {
 	return fmt.Sprintf("[[IMAGE:%s]]", filename)
 }
 
+func replaceImage(filename string) string {
+	return fmt.Sprintf("[[REPLACE_IMAGE:%s]]", filename)
+}
+
 func toCenteredImage(s string) string {
 	return fmt.Sprintf("[[CENTERED_IMAGE:%s]]", s)
 }
