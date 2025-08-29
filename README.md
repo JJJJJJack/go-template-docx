@@ -293,7 +293,7 @@ To use the `replaceImage` function you need to:
 ![](https://github.com/JJJJJJack/jubilant-fortnight/blob/main/go-template-docx/replaceimage1.png)
 2. right click on the image and select "Edit Alt Text"
 ![](https://github.com/JJJJJJack/jubilant-fortnight/blob/main/go-template-docx/replaceimage2.png)
-3. in the "Description" field place the `{{replaceImage .ImageFilename}}` instruction
+3. write the template expression `{{replaceImage .ImageFilename}}`
 ![](https://github.com/JJJJJJack/jubilant-fortnight/blob/main/go-template-docx/replaceimage3.png)
 4. now when you run the templating engine the image will be replaced while preserving its size, position and other properties
 ![](https://github.com/JJJJJJack/jubilant-fortnight/blob/main/go-template-docx/replaceimage4.png)
