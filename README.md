@@ -284,3 +284,16 @@ there are 3 important things to notice here:
 - `{{ toNumberCell .Pie.MediumSum}}` -> `30`
 - `{{ toNumberCell .Pie.LowSum}}` -> `40`
 > still note that we use the `toNumberCell` function to set the cell type and make it readable by the docx chart
+
+### 6. Replacing an image while preserving its style properties
+- `{{replaceImage .ImageFilename}}` -> looks for the media filename loaded through `template.Media(...)` equal to the `ImageFilename` field
+
+To use the `replaceImage` function you need to:
+1. insert an image in the docx file where you want to place the new image
+![](https://github.com/JJJJJJack/jubilant-fortnight/blob/main/go-template-docx/replaceimage1.png)
+2. right click on the image and select "Edit Alt Text"
+![](https://github.com/JJJJJJack/jubilant-fortnight/blob/main/go-template-docx/replaceimage2.png)
+3. in the "Description" field place the `{{replaceImage .ImageFilename}}` instruction
+![](https://github.com/JJJJJJack/jubilant-fortnight/blob/main/go-template-docx/replaceimage3.png)
+4. now when you run the templating engine the image will be replaced while preserving its size, position and other properties
+![](https://github.com/JJJJJJack/jubilant-fortnight/blob/main/go-template-docx/replaceimage4.png)
