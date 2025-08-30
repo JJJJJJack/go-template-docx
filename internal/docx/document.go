@@ -175,6 +175,8 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 		return nil, fmt.Errorf("unable to parse template in file '%s': %w", f.Name, err)
 	}
 
+	data = preserveWhitespaces(data)
+
 	appliedTemplate := bytes.Buffer{}
 	err = tmpl.Execute(&appliedTemplate, data)
 	if err != nil {
@@ -187,22 +189,14 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 	}
 
 	output, replaceMedia := d.replaceImages(output)
-	if err != nil {
-		return nil, fmt.Errorf("unable to replace images in file '%s': %w", f.Name, err)
-	}
+
 	media = append(media, replaceMedia...)
 
 	output = d.applyShapesBgFillColor(output)
-	if err != nil {
-		return nil, fmt.Errorf("unable to apply shapes background fill color in file '%s': %w", f.Name, err)
-	}
 
 	output = d.replaceTableCellBgColors(output)
-	if err != nil {
-		return nil, fmt.Errorf("unable to replace table cell background colors in file '%s': %w", f.Name, err)
-	}
 
-	output = postProcessing(output)
+	output = removeEmptyTableRows(output)
 
 	err = goziputils.RewriteFileIntoZipWriter(zipWriter, f, []byte(output))
 	if err != nil {
