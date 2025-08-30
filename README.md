@@ -23,7 +23,7 @@ The library doesn't change the original files and only reads it into memory to o
   - the `toNumberCell` template function sets the chart cell a readable number to make a graphically evaluable chart
 - supports tables templating
 - supports shapes
-  - the `shapeBgFillColor` template function changes the shape background fill color (first you need to set a fill color to the shape in the docx template)
+  - the `shapeBgFillColor` template function changes the shape background fill color by putting the template expression in the shape's alt-text
 - supports preserving text formatting (color, bold, italic, font size, etc...) when replacing text
 
 # Template functions list
@@ -38,8 +38,8 @@ The library doesn't change the original files and only reads it into memory to o
 > `{{breakParagraph .TextWithNewlines}}`
 - `shadeTextBg(hex string, s string)`: applies a background color to the given text, hex string must be in the format `RRGGBB` or `#RRGGBB`
 > `{{shadeTextBg .TextBgHex .Text}}`
-- `shapeBgFillColor(hex string)`: changes the shape's background fill color, hex string must be in the format `RRGGBB` or `#RRGGBB` and the shape must already have a fill color applied to work
-> `{{shapeBgFillColor .ShapeBgHex}}` inside the shape's text
+- `shapeBgFillColor(hex string)`: changes the shape's background fill color, hex string must be in the format `RRGGBB` or `#RRGGBB`
+> `{{shapeBgFillColor .ShapeBgHex}}` inside the shape's alt-text
 - `toNumberCell(v any)`: (for excel sheets, like charts) sets the cell type to number, useful to make charts work properly, v can be any type that can be converted to a float64
 
 # Usage
