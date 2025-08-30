@@ -89,7 +89,7 @@ func (d *documentMeta) replaceImages(srcXML string) (string, []MediaRel) {
 }
 
 const withoutSolidFill = `</a:prstGeom></wps:spPr>`
-const withSolidFill = `</a:prstGeom><a:solidFill><a:srgbClr val="ff0000" /></a:solidFill></wps:spPr>`
+const withSolidFill = `</a:prstGeom><a:solidFill><a:srgbClr val="ffffff" /></a:solidFill></wps:spPr>`
 
 // ReplaceAllShapeBgColors finds shapes that contain the [[SHAPE_BG_COLOR:RRGGBB]]/[[SHAPE_BG_COLOR:#RRGGBB]]
 // placeholder and uses its value to replace the fillcolor attribute of the shape
@@ -108,9 +108,11 @@ func (d *documentMeta) applyShapesBgFillColor(srcXML string) string {
 		for _, pm := range placeholders {
 			hex := strings.ToLower(pm[1])
 
-			block = strings.Replace(block, withoutSolidFill, withSolidFill, 1)
-
 			srgbRe := regexp.MustCompile(`(?i)<a:srgbClr\s+val="[^"]*"\s*/>`)
+			if !srgbRe.MatchString(block) {
+				block = strings.Replace(block, withoutSolidFill, withSolidFill, 1)
+			}
+
 			block = srgbRe.ReplaceAllString(block, `<a:srgbClr val="`+hex+`"/>`)
 
 			fillColorRe := regexp.MustCompile(`(?i)\bfillcolor="[^"]*"`)
@@ -125,52 +127,36 @@ func (d *documentMeta) applyShapesBgFillColor(srcXML string) string {
 	})
 }
 
-// replaceTableCellBgColors finds table cells with [[TABLE_CELL_BG_COLOR:#RRGGBB]]
-// placeholders, removes the placeholder text (leaving the <w:t> node intact),
-// and applies the color to the w:shd/@w:fill attribute.
+const withoutShading = `></w:tcPr>`
+const withShading = `><w:shd w:val="clear" w:color="auto" w:fill="FFFFFF" /></w:tcPr>`
+
+// replaceTableCellBgColors is used to apply the hex color found in the
+// [[TABLE_CELL_BG_COLOR:RRGGBB]]/[[TABLE_CELL_BG_COLOR:#RRGGBB]] as the background color of the table cell
 func (d *documentMeta) replaceTableCellBgColors(srcXML string) string {
-	// Regex to match [[SHAPE_BG_FILL_COLOR:#RRGGBB]] in descr or alt
-	placeholderRe := regexp.MustCompile(`\[\[SHAPE_BG_FILL_COLOR:#?([0-9A-Fa-f]{6})\]\]`)
+	tcRe := regexp.MustCompile(`(?s)<w:tc>.*?</w:tc>`)
 
-	// Match each <mc:AlternateContent> block separately
-	altContentRe := regexp.MustCompile(`(?s)<mc:AlternateContent>.*?</mc:AlternateContent>`)
-
-	return altContentRe.ReplaceAllStringFunc(srcXML, func(block string) string {
-		placeholders := placeholderRe.FindAllStringSubmatch(block, -1)
-		if len(placeholders) == 0 {
+	return tcRe.ReplaceAllStringFunc(srcXML, func(block string) string {
+		hexRe := regexp.MustCompile(`\[\[TABLE_CELL_BG_COLOR:#?([0-9A-Fa-f]{6})\]\]`)
+		hexMatch := hexRe.FindStringSubmatch(block)
+		if len(hexMatch) < 2 {
 			return block
 		}
+		hex := hexMatch[1]
 
-		for _, pm := range placeholders {
-			hex := strings.ToLower(pm[1])
-
-			// 1️⃣ Try to replace existing <a:srgbClr val="..."/>
-			srgbRe := regexp.MustCompile(`(?i)<a:srgbClr\s+val="[^"]*"\s*/>`)
-			if srgbRe.MatchString(block) {
-				block = srgbRe.ReplaceAllString(block, `<a:srgbClr val="`+hex+`"/>`)
-			} else {
-				// 2️⃣ If not found, insert it inside <a:solidFill> or create <a:solidFill>
-				solidFillRe := regexp.MustCompile(`(?i)<a:solidFill>`)
-				if solidFillRe.MatchString(block) {
-					block = solidFillRe.ReplaceAllString(block, `<a:solidFill><a:srgbClr val="`+hex+`"/>`)
-				} else {
-					// Fallback: create <a:solidFill> at reasonable place in <wps:spPr>
-					spPrRe := regexp.MustCompile(`(?s)(<wps:spPr>.*?</wps:spPr>)`)
-					block = spPrRe.ReplaceAllStringFunc(block, func(sppr string) string {
-						return strings.Replace(sppr, "</wps:spPr>", `<a:solidFill><a:srgbClr val="`+hex+`"/></a:solidFill></wps:spPr>`, 1)
-					})
-				}
-			}
-
-			// Replace fillcolor in VML shapes
-			fillColorRe := regexp.MustCompile(`(?i)\bfillcolor="[^"]*"`)
-			block = fillColorRe.ReplaceAllStringFunc(block, func(fc string) string {
-				return `fillcolor="#` + hex + `"`
-			})
+		if !regexp.MustCompile(`(?i)<w:shd[^>]*?/>`).MatchString(block) {
+			block = strings.Replace(block, withoutShading, withShading, 1)
 		}
 
-		// Remove all placeholders from descr and alt
-		block = placeholderRe.ReplaceAllString(block, "")
+		fillRe := regexp.MustCompile(`(?i)(<w:shd[^>]*? w:fill=")[^"]*(")`)
+		if fillRe.MatchString(block) {
+			block = fillRe.ReplaceAllString(block, `${1}`+hex+`${2}`)
+		} else {
+			shdRe := regexp.MustCompile(`(?i)(<w:shd)`)
+			block = shdRe.ReplaceAllString(block, `${1} w:fill="`+hex+`"`)
+		}
+
+		block = hexRe.ReplaceAllString(block, ``)
+		block = strings.ReplaceAll(block, "<w:r><w:t></w:t></w:r>", "")
 
 		return block
 	})
