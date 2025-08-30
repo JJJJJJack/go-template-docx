@@ -118,9 +118,9 @@ const imageTemplateXml = `<w:drawing>
 </w:drawing>`
 
 const (
-	DOCX_NEWLINE_INJECT        = "</w:t></w:r><w:r><w:br/></w:r><w:r><w:t>"
+	DOCX_NEWLINE_INJECT        = "</w:t><w:br/><w:t>"
 	DOCX_BREAKPARAGRAPH_INJECT = "</w:t></w:r></w:p><w:p><w:r><w:t>"
-	RGB_SHADING_WRAPPER_F      = `<w:r><w:rPr><w:shd w:val="clear" w:color="auto" w:fill="%s"/></w:rPr><w:t>%s</w:t></w:r>`
+	RGB_SHADING_WRAPPER_F      = `<w:rPr><w:shd w:val="clear" w:color="auto" w:fill="%s"/></w:rPr><w:t>%s</w:t>`
 )
 
 func image(filename string) string {
