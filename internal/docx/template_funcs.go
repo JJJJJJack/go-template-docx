@@ -154,5 +154,10 @@ func shadeTextBg(hex, s string) string {
 
 // shapeBgFillColor replace fillcolor to shapes
 func shapeBgFillColor(s string) string {
-	return fmt.Sprintf("[[SHAPE_BG_COLOR:%s]]", s)
+	return fmt.Sprintf("[[SHAPE_BG_FILL_COLOR:%s]]", s)
+}
+
+// tableCellBgColor replace background color of table cells
+func tableCellBgColor(s string) string {
+	return fmt.Sprintf("[[TABLE_CELL_BG_COLOR:%s]]", s)
 }

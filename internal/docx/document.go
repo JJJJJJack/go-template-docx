@@ -4,10 +4,8 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"path"
 	"regexp"
 	"strconv"
-	"strings"
 	"text/template"
 
 	goziputils "github.com/JJJJJJack/go-zip-utils"
@@ -91,6 +89,7 @@ func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap) (*documentMeta
 			"breakParagraph":   breakParagraph,
 			"shadeTextBg":      shadeTextBg,
 			"shapeBgFillColor": shapeBgFillColor,
+			"tableCellBgColor": tableCellBgColor,
 		},
 	}
 
@@ -161,126 +160,6 @@ func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap) (*documentMeta
 	return &d, nil
 }
 
-func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
-	mediaRels := []MediaRel{}
-
-	imagePlaceholderRE := regexp.MustCompile(`\[\[IMAGE:.*?\]\]`)
-	xmlBlocks := imagePlaceholderRE.FindAllString(srcXML, -1)
-	for _, xmlBlock := range xmlBlocks {
-		filename := strings.TrimPrefix(xmlBlock, "[[IMAGE:")
-		filename = strings.TrimSuffix(filename, "]]")
-
-		buffer := bytes.Buffer{}
-		docPrId, err := d.RandUniqueDocPrId()
-		if err != nil {
-			return srcXML, mediaRels, fmt.Errorf("unable to get unique docPrId: %w", err)
-		}
-
-		rid := d.NextRId()
-		rId := fmt.Sprintf("rId%d", rid)
-
-		imageTemplate, err := template.New("image-template").Parse(imageTemplateXml)
-		if err != nil {
-			return srcXML, mediaRels, err
-		}
-
-		err = imageTemplate.Execute(&buffer, XmlImageData{
-			DocPrId: docPrId,
-			Name:    filename,
-			RefID:   rId,
-		})
-		if err != nil {
-			return srcXML, mediaRels, fmt.Errorf("unable to execute image template: %w", err)
-		}
-
-		mediaRels = append(mediaRels, MediaRel{
-			Type:   ImageMediaType,
-			RefID:  rId,
-			Source: path.Join("media", filename),
-		})
-
-		srcXML = strings.ReplaceAll(srcXML, xmlBlock, buffer.String())
-	}
-
-	return srcXML, mediaRels, nil
-}
-
-// replaceImages looks for [[REPLACE_IMAGE:filename.ext]] placeholders inside <w:drawing>...</w:drawing> blocks
-// remove the placeholder and replaces the image reference inside the block with the given image's rId.
-func (d *documentMeta) replaceImages(srcXML string) (string, []MediaRel, error) {
-	anchorRe := regexp.MustCompile(`(?s)<w:drawing>.*?</w:drawing>`)
-	placeholderRe := regexp.MustCompile(`\[\[REPLACE_IMAGE:([^\]]+)\]\]`)
-	blipRe := regexp.MustCompile(`(<a:blip\s+r:embed=")[^"]*(")`)
-
-	mediaRels := []MediaRel{}
-
-	result := anchorRe.ReplaceAllStringFunc(srcXML, func(block string) string {
-		pm := placeholderRe.FindStringSubmatch(block)
-		if len(pm) < 2 {
-			return block
-		}
-		filename := pm[1]
-
-		block = placeholderRe.ReplaceAllString(block, "")
-
-		rid := d.NextRId()
-		rId := fmt.Sprintf("rId%d", rid)
-
-		mediaRels = append(mediaRels, MediaRel{
-			Type:   ImageMediaType,
-			RefID:  rId,
-			Source: path.Join("media", filename),
-		})
-
-		block = blipRe.ReplaceAllString(block, "${1}"+rId+"${2}")
-
-		return block
-	})
-
-	return result, mediaRels, nil
-}
-
-// ReplaceAllShapeBgColors finds shapes that contain the [[SHAPE_BG_COLOR:RRGGBB]]/[[SHAPE_BG_COLOR:#RRGGBB]]
-// placeholder and uses its value to replace the fillcolor attribute of the shape
-// TODO: replace with proper XML parsing
-func (d *documentMeta) applyShapesBgFillColor(srcXML string) (string, error) {
-	shapeBlockRe := regexp.MustCompile(`(?s)<v:(?:shape|rect|roundrect|oval|line|polyline|arc|curve)\b[^>]*>.*?</v:(?:shape|rect|roundrect|oval|line|polyline|arc|curve)>`)
-
-	placeholderRe := regexp.MustCompile(`\[\[SHAPE_BG_COLOR:#?([0-9A-Fa-f]{6})\]\]`)
-
-	result := shapeBlockRe.ReplaceAllStringFunc(srcXML, func(block string) string {
-		pm := placeholderRe.FindStringSubmatch(block)
-		if len(pm) < 2 {
-			return block
-		}
-
-		hex := strings.ToUpper(pm[1])
-		if !strings.HasPrefix(hex, "#") {
-			hex = "#" + hex
-		}
-
-		block = placeholderRe.ReplaceAllString(block, "")
-
-		startTagRe := regexp.MustCompile(`(?s)^<v:(?:roundrect|rect|shape)\b[^>]*>`)
-		startTag := startTagRe.FindString(block)
-		if startTag == "" {
-			return block
-		}
-		rest := block[len(startTag):]
-
-		fillAttrRe := regexp.MustCompile(`\bfillcolor="[^"]*"`)
-		if fillAttrRe.MatchString(startTag) {
-			startTag = fillAttrRe.ReplaceAllString(startTag, `fillcolor="`+hex+`"`)
-		} else {
-			startTag = strings.Replace(startTag, ">", ` fillcolor="`+hex+`">`, 1)
-		}
-
-		return startTag + rest
-	})
-
-	return result, nil
-}
-
 func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data any) ([]MediaRel, error) {
 	documentXml, err := goziputils.ReadZipFileContent(f)
 	if err != nil {
@@ -307,15 +186,20 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 		return nil, fmt.Errorf("unable to apply images in file '%s': %w", f.Name, err)
 	}
 
-	output, replaceMedia, err := d.replaceImages(output)
+	output, replaceMedia := d.replaceImages(output)
 	if err != nil {
 		return nil, fmt.Errorf("unable to replace images in file '%s': %w", f.Name, err)
 	}
 	media = append(media, replaceMedia...)
 
-	output, err = d.applyShapesBgFillColor(output)
+	output = d.applyShapesBgFillColor(output)
 	if err != nil {
 		return nil, fmt.Errorf("unable to apply shapes background fill color in file '%s': %w", f.Name, err)
+	}
+
+	output = d.replaceTableCellBgColors(output)
+	if err != nil {
+		return nil, fmt.Errorf("unable to replace table cell background colors in file '%s': %w", f.Name, err)
 	}
 
 	output = postProcessing(output)
