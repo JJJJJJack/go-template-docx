@@ -53,10 +53,12 @@ const (
 	RGB_SHADING_WRAPPER_F      = `<w:rPr><w:shd w:val="clear" w:color="auto" w:fill="%s"/></w:rPr><w:t>%s</w:t>`
 )
 
+// image is a placeholder for image insertion in the document.
 func image(filename string) string {
 	return fmt.Sprintf("[[IMAGE:%s]]", filename)
 }
 
+// replaceImage is a placeholder for image replacement in the document.
 func replaceImage(filename string) string {
 	return fmt.Sprintf("[[REPLACE_IMAGE:%s]]", filename)
 }
