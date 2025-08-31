@@ -35,38 +35,44 @@ The library doesn't change the original files and only reads it into memory to o
 # Template functions list
 
 - `image(filename string)`: the filename parameter looks for an equal loaded `Media`'s filename
-> `{{image .ImageFilename}}`
+  - `{{image .ImageFilename}}`
 - `replaceImage(filename string)`: the filename parameter looks for an equal loaded `Media`'s filename, it replaces the image inside a `<w:drawing>...</w:drawing>` block, useful to keep the image size and position
-> `{{replaceImage .ImageFilename}}` inside the `alt-text` of the image to replace
+  - `{{replaceImage .ImageFilename}}` inside the `alt-text` of the image to replace
 - `preserveNewline(text string)`: newlines are treated as `SHIFT + ENTER` input, thus keeping the text in the same paragraph.
-> `{{preserveNewline .TextWithNewlines}}`
+  - `{{preserveNewline .TextWithNewlines}}`
 - `breakParagraph(s string)`: newlines are treated as `ENTER` input, thus creating a new paragraph for the sequent line.
-> `{{breakParagraph .TextWithNewlines}}`
+  - `{{breakParagraph .TextWithNewlines}}`
 - `shadeTextBg(hex string, s string)`: applies a background color to the given text, hex string must be in the format `RRGGBB` or `#RRGGBB`
-> `{{shadeTextBg .TextBgHex .Text}}`
+  - `{{shadeTextBg .TextBgHex .Text}}`
 - `shapeBgFillColor(hex string)`: changes the shape's background fill color, hex string must be in the format `RRGGBB` or `#RRGGBB`
-> `{{shapeBgFillColor .ShapeBgHex}}` inside the shape's alt-text
+  - `{{shapeBgFillColor .ShapeBgHex}}` inside the shape's alt-text
 - `toNumberCell(v any)`: (for excel sheets, like charts) sets the cell type to number, useful to make charts work properly, v can be any type that can be converted to a float64
-> `{{toNumberCell .Number}}` inside the cell text
+  - `{{toNumberCell .Number}}` inside the cell text
 - `tableCellBgColor(hex string)`: changes the table cell background fill color, hex string must be in the format `RRGGBB` or `#RRGGBB`
-> `{{tableCellBgColor .TableCellBgHex}}` inside the table cell text
-- `styledText(s ...string)`: applies multiple styles to the given text, the first argument is the text, the following arguments are styles, supported (case insensitive) styles are:
-  - `b` or `bold`
-  - `i` or `italic`
-  - `u` or `underline`
-  - `s` or `strikethrough`
-  - `fontsize:<size>` | `fs:<size>` where `<size>` is the font size in points (e.g. for 12pt font size use `fontsize:12` or `fs:12`)
-> `{{styledText .Text "b" "i" "fs:14"}}` to apply bold, italic and 14pt font size to the text, this is the most efficient way to apply multiple styles at once
+  - `{{tableCellBgColor .TableCellBgHex}}` inside the table cell text
+- `styledText(s ...string)`: applies multiple styles to the given text, the first argument is the text, the following arguments are styles:
+  - example: `{{styledText .Text "b" "i" "fs:14"}}` to apply bold, italic and 14pt font size to the text, this is the most efficient way to apply multiple styles at once, all the styles parameters are:
+    - `b` | `bold`
+    - `i` | `italic`
+    - `u` | `underline`
+    - `s` | `strike` | `strikethrough`
+    - `fontSize:<size>` | `fs:<size>` where `<size>` is the font size in points (e.g. for 12pt font size use `fontsize:12` or `fs:12`)
+    - `#RRGGBB` or `RRGGBB` to apply a color to the text
+    - `<highlightColor>` to apply a highlight color to the text, color string are defined here https://c-rex.net/samples/ooxml/e1/Part4/OOXML_P4_DOCX_ST_HighlightColor_topic_ID0E4PY2.html
 - `bold(s string)`
-> `{{bold .Text}}`
+  - `{{bold .Text}}`
 - `italic(s string)`
-> `{{italic .Text}}`
+  - `{{italic .Text}}`
 - `underline(s string)`
-> `{{underline .Text}}`
+  - `{{underline .Text}}`
 - `strike(s string)`
-> `{{strike .Text}}`
+  - `{{strike .Text}}`
 - `fontSize(s string, size int)`
-> `{{fontSize .Text 14}}` to apply 14pt font size to the text
+  - `{{fontSize .Text 14}}` to apply 14pt font size to the text
+- `color(s string, hex string)`: applies a color to the given text, hex string must be in the format `RRGGBB` or `#RRGGBB`
+  - `{{color .Text "FF0000"}}` to apply red color to the text
+- `highlight(s string, color string)`: applies a highlight color to the given text, color string are defined here https://c-rex.net/samples/ooxml/e1/Part4/OOXML_P4_DOCX_ST_HighlightColor_topic_ID0E4PY2.html
+  - `{{highlight .Text "yellow"}}` to apply yellow highlight to the text
 
 # Usage
 
