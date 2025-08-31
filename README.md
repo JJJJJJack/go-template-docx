@@ -34,8 +34,6 @@ The library doesn't change the original files and only reads it into memory to o
   - `{{preserveNewline .TextWithNewlines}}`
 - `breakParagraph(s string)`: newlines are treated as `ENTER` input, thus creating a new paragraph for the sequent line.
   - `{{breakParagraph .TextWithNewlines}}`
-- `shadeTextBg(hex string, s string)`: applies a background color to the given text, hex string must be in the format `RRGGBB` or `#RRGGBB`
-  - `{{shadeTextBg .TextBgHex .Text}}`
 - `shapeBgFillColor(hex string)`: changes the shape's background fill color, hex string must be in the format `RRGGBB` or `#RRGGBB`
   - `{{shapeBgFillColor .ShapeBgHex}}` inside the shape's alt-text
 - `toNumberCell(v any)`: (for excel sheets, like charts) sets the cell type to number, useful to make charts work properly, v can be any type that can be converted to a float64
@@ -67,6 +65,8 @@ The library doesn't change the original files and only reads it into memory to o
   - `{{color .Text "FF0000"}}` to apply red color to the text
 - `highlight(s string, color string)`: applies a highlight color to the given text, color string are defined here https://c-rex.net/samples/ooxml/e1/Part4/OOXML_P4_DOCX_ST_HighlightColor_topic_ID0E4PY2.html
   - `{{highlight .Text "yellow"}}` to apply yellow highlight to the text
+- `shadeTextBg(hex string, s string)`: applies a background color to the given text, hex string must be in the format `RRGGBB` or `#RRGGBB`
+  - `{{shadeTextBg .TextBgHex .Text}}`
 
 # Usage
 
