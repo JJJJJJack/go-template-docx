@@ -135,7 +135,7 @@ const withShading = `><w:shd w:val="clear" w:color="auto" w:fill="FFFFFF" /></w:
 func (d *documentMeta) replaceTableCellBgColors(srcXML string) string {
 	tcRe := regexp.MustCompile(`(?s)<w:tc>.*?</w:tc>`)
 
-	return tcRe.ReplaceAllStringFunc(srcXML, func(block string) string {
+	output := tcRe.ReplaceAllStringFunc(srcXML, func(block string) string {
 		hexRe := regexp.MustCompile(`\[\[TABLE_CELL_BG_COLOR:#?([0-9A-Fa-f]{6})\]\]`)
 		hexMatch := hexRe.FindStringSubmatch(block)
 		if len(hexMatch) < 2 {
@@ -160,4 +160,16 @@ func (d *documentMeta) replaceTableCellBgColors(srcXML string) string {
 
 		return block
 	})
+
+	// remove empty table rows
+	re := regexp.MustCompile(`<w:tr\b[^>]*>[\s\S]*?</w:tr>`)
+	matches := re.FindAllString(output, -1)
+	for _, match := range matches {
+		if !strings.Contains(match, "<w:t></w:t>") {
+			continue
+		}
+		output = strings.ReplaceAll(output, match, "")
+	}
+
+	return output
 }
