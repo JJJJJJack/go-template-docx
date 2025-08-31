@@ -58,7 +58,10 @@ const (
 	ITALIC_W_TAG        = `<w:i /><w:iCs />`
 	UNDERLINE_W_TAG     = `<w:u w:val="single"/>`
 	STRIKETHROUGH_W_TAG = `<w:strike />`
-	FONT_SIZE_W_TAGS    = `<w:sz w:val="%d" /><w:szCs w:val="%d" />`
+	FONT_SIZE_W_TAGS_F  = `<w:sz w:val="%d" /><w:szCs w:val="%d" />`
+	COLOR_W_TAG_F       = `<w:color w:val="%s" />`
+	HIGHLIGHT_W_TAG_F   = `<w:highlight w:val="%s" />`
+	// HIGHLIGHT all values: https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.wordprocessing.highlightcolor?view=openxml-2.8.1
 )
 
 var (
@@ -66,6 +69,8 @@ var (
 	ITALIC_WRAPPER_F        = fmt.Sprintf(STYLE_WRAPPER_F, ITALIC_W_TAG, "%s")
 	UNDERLINE_WRAPPER_F     = fmt.Sprintf(STYLE_WRAPPER_F, UNDERLINE_W_TAG, "%s")
 	STRIKETHROUGH_WRAPPER_F = fmt.Sprintf(STYLE_WRAPPER_F, STRIKETHROUGH_W_TAG, "%s")
+	COLOR_WRAPPER_F         = fmt.Sprintf(STYLE_WRAPPER_F, COLOR_W_TAG_F, "%s")
+	HIGHLIGHT_WRAPPER_F     = fmt.Sprintf(STYLE_WRAPPER_F, HIGHLIGHT_W_TAG_F, "%s")
 )
 
 func fontSizeWrapperf(sizeHalfPoints int) string {
@@ -73,11 +78,11 @@ func fontSizeWrapperf(sizeHalfPoints int) string {
 		sizeHalfPoints = 1
 	}
 
-	return fmt.Sprintf(FONT_SIZE_W_TAGS, sizeHalfPoints*2, sizeHalfPoints*2)
+	return fmt.Sprintf(FONT_SIZE_W_TAGS_F, sizeHalfPoints*2, sizeHalfPoints*2)
 }
 
 const (
-	FONT_SIZE_STYLE_PREFIX       = "fontsize:"
+	FONT_SIZE_STYLE_PREFIX       = "fontSize:"
 	FONT_SIZE_STYLE_PREFIX_SHORT = "fs:"
 )
 
@@ -96,8 +101,9 @@ func styledText(s ...string) (string, error) {
 			continue
 		}
 
-		styleParam := strings.ToLower(s[i])
+		styleParam := s[i]
 
+		// font size style
 		if strings.HasPrefix(styleParam, FONT_SIZE_STYLE_PREFIX) || strings.HasPrefix(styleParam, FONT_SIZE_STYLE_PREFIX_SHORT) {
 			if strings.Contains(styles, "<w:sz w:val=") {
 				return "", fmt.Errorf("styledText got multiple font size styles")
@@ -112,6 +118,18 @@ func styledText(s ...string) (string, error) {
 			}
 
 			styles += fontSizeWrapperf(ptSize)
+			continue
+		}
+
+		// color style
+		if strings.HasPrefix(styleParam, "#") {
+			if strings.Contains(styles, "<w:color w:val=") {
+				return "", fmt.Errorf("styledText got multiple color styles")
+			}
+
+			hex := strings.ToUpper(strings.TrimPrefix(styleParam, "#"))
+
+			styles += fmt.Sprintf(COLOR_W_TAG_F, hex)
 			continue
 		}
 
@@ -140,6 +158,16 @@ func styledText(s ...string) (string, error) {
 			}
 
 			styles += STRIKETHROUGH_W_TAG
+		case "black", "blue", "cyan", "green",
+			"magenta", "red", "yellow", "white",
+			"darkBlue", "darkCyan", "darkGreen",
+			"darkMagenta", "darkRed", "darkYellow",
+			"darkGray", "lightGray", "none":
+			if strings.Contains(styles, "<w:highlight w:val=") {
+				return "", fmt.Errorf("styledText got multiple highlight colors styles")
+			}
+
+			styles += fmt.Sprintf(HIGHLIGHT_W_TAG_F, styleParam)
 		default:
 			return "", fmt.Errorf("styledText got unknown style: %s", s[i])
 		}
@@ -173,6 +201,39 @@ func fontSize(s string, sizeHalfPoints int) string {
 	return fmt.Sprintf(STYLE_WRAPPER_F, fontSizeWrapperf(sizeHalfPoints), s)
 }
 
+// color sets the font color of the text
+func color(s, hex string) (string, error) {
+	hex = strings.TrimPrefix(hex, "#")
+	return fmt.Sprintf(COLOR_WRAPPER_F, hex, s), nil
+}
+
+// highlight applies a highlight color to the text
+func highlight(s, color string) (string, error) {
+	switch color {
+	case "black":
+	case "blue":
+	case "cyan":
+	case "green":
+	case "magenta":
+	case "red":
+	case "yellow":
+	case "white":
+	case "darkBlue":
+	case "darkCyan":
+	case "darkGreen":
+	case "darkMagenta":
+	case "darkRed":
+	case "darkYellow":
+	case "darkGray":
+	case "lightGray":
+	case "none":
+	default:
+		return "", fmt.Errorf("highlight: invalid highlight color value: %s", color)
+	}
+
+	return fmt.Sprintf(HIGHLIGHT_WRAPPER_F, color, s), nil
+}
+
 // image wraps a placeholder around the given filename for image insertion in the document.
 func image(filename string) string {
 	return fmt.Sprintf("[[IMAGE:%s]]", filename)
@@ -196,7 +257,7 @@ func breakParagraph(s string) string {
 }
 
 // shadeTextBg applies a background color to the given text
-func shadeTextBg(hex, s string) string {
+func shadeTextBg(s, hex string) string {
 	return fmt.Sprintf(RGB_SHADING_WRAPPER_F, hex, s)
 }
 

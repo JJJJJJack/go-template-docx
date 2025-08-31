@@ -88,6 +88,8 @@ func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap) (*documentMeta
 			"strike":           strike,
 			"fontSize":         fontSize,
 			"styledText":       styledText,
+			"color":            color,
+			"highlight":        highlight,
 			"preserveNewline":  preserveNewline,
 			"breakParagraph":   breakParagraph,
 			"shadeTextBg":      shadeTextBg,
