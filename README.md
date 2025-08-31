@@ -2,6 +2,8 @@
 
 `go get github.com/JJJJJJack/go-template-docx`
 
+⭐ Please consider supporting by starring the repo ⭐
+
 # Notes
 
 ```diff
@@ -14,22 +16,12 @@ The library doesn't change the original files and only reads it into memory to o
 
 - supports go1.18+
 - based on the golang template library syntaxes with features such as:
-  - text replacement
-  - loops
-  - conditional statements
-  - array indexing
-  - nested structures/arrays
-  - supports adding your own custom template functions
+- supports adding your own custom template functions
 - supports text styling
 - supports images (png|jpg)
-  - the `image` template function places an image in the docx file
-  - the `replaceImage` template function replaces an existing image in the docx file, useful to keep the image size, position, style and other properties
-- supports embedded charts templating:
-  - the `toNumberCell` template function sets the chart cell a readable number to make a graphically evaluable chart
+- supports embedded charts templating
 - supports tables templating
-  - the `tableCellBgColor` template function changes the table cell background fill color by putting the template expression in the cell text
 - supports shapes
-  - the `shapeBgFillColor` template function changes the shape background fill color by putting the template expression in the shape's alt-text
 - supports preserving text formatting (color, bold, italic, font size, etc...) when replacing text
 
 # Template functions list
@@ -50,8 +42,10 @@ The library doesn't change the original files and only reads it into memory to o
   - `{{toNumberCell .Number}}` inside the cell text
 - `tableCellBgColor(hex string)`: changes the table cell background fill color, hex string must be in the format `RRGGBB` or `#RRGGBB`
   - `{{tableCellBgColor .TableCellBgHex}}` inside the table cell text
-- `styledText(s ...string)`: applies multiple styles to the given text, the first argument is the text, the following arguments are styles:
-  - example: `{{styledText .Text "b" "i" "fs:14"}}` to apply bold, italic and 14pt font size to the text, this is the most efficient way to apply multiple styles at once, all the styles parameters are:
+- `inlineStyledText(text string, styles ...interface{})`: applies multiple styles to the given text, the styles parameter must be a variadic list of strings, each string is a style to apply, see the styles list below
+  - example: `{{inlineStyledText .Text "b" "i" "fs:14" "bg:#C0FFEE" "#FF0000"}}` to apply bold, italic, 14pt font size, a light blue background color and make the text red 
+- `styledText(text string, styles []interface{})`: applies multiple styles to the given text, the styles parameter must be a slice of strings, each string is a style to apply, see the styles list below
+  - example: `{{styledText .Text (list "b" "i" "fs:14" "bg:#C0FFEE" "#FF0000")}}` to apply bold, italic, 14pt font size, a light blue background color and make the text red, you can use this function with a golang slice variable too like so `{{styledText .Text .BoldItalicFontSize14ptBgCyanTextRedStyle}}`
     - `b` | `bold`
     - `i` | `italic`
     - `u` | `underline`

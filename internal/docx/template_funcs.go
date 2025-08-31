@@ -51,7 +51,6 @@ const imageTemplateXml = `<w:drawing>
 const (
 	DOCX_NEWLINE_INJECT        = `</w:t><w:br/><w:t>`
 	DOCX_BREAKPARAGRAPH_INJECT = `</w:t></w:r></w:p><w:p><w:r><w:t>`
-	RGB_SHADING_WRAPPER_F      = `<w:rPr><w:shd w:val="clear" w:color="auto" w:fill="%s"/></w:rPr><w:t>%s</w:t>`
 
 	STYLE_WRAPPER_F     = `<w:rPr>%s</w:rPr><w:t>%s</w:t>`
 	BOLD_W_TAG          = `<w:b /><w:bCs />`
@@ -62,6 +61,7 @@ const (
 	COLOR_W_TAG_F       = `<w:color w:val="%s" />`
 	HIGHLIGHT_W_TAG_F   = `<w:highlight w:val="%s" />`
 	// HIGHLIGHT all values: https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.wordprocessing.highlightcolor?view=openxml-2.8.1
+	SHADING_W_TAG_F = `<w:shd w:val="clear" w:color="auto" w:fill="%s"/>`
 )
 
 var (
@@ -71,6 +71,7 @@ var (
 	STRIKETHROUGH_WRAPPER_F = fmt.Sprintf(STYLE_WRAPPER_F, STRIKETHROUGH_W_TAG, "%s")
 	COLOR_WRAPPER_F         = fmt.Sprintf(STYLE_WRAPPER_F, COLOR_W_TAG_F, "%s")
 	HIGHLIGHT_WRAPPER_F     = fmt.Sprintf(STYLE_WRAPPER_F, HIGHLIGHT_W_TAG_F, "%s")
+	SHADING_WRAPPER_F       = fmt.Sprintf(STYLE_WRAPPER_F, SHADING_W_TAG_F, "%s")
 )
 
 func fontSizeWrapperf(sizeHalfPoints int) string {
@@ -84,29 +85,29 @@ func fontSizeWrapperf(sizeHalfPoints int) string {
 const (
 	FONT_SIZE_STYLE_PREFIX       = "fontSize:"
 	FONT_SIZE_STYLE_PREFIX_SHORT = "fs:"
+	TEXT_SHADING_STYLE_PREFIX    = "bg:"
 )
 
-// styledText applies multiple styles to the given text.
-// The first argument is the text, the following arguments are styles.
-func styledText(s ...string) (string, error) {
-	if len(s) < 2 {
-		return "", fmt.Errorf("styledText requires at least 1 text argument followed by style arguments")
-	}
+// list enables you to take a variadic number of arguments and
+// returns them as a slice of interface{} to another function
+// directly from the template expressions.
+func list(args ...interface{}) []interface{} {
+	return args
+}
 
-	text := ""
+// formatStylesTags takes a slice of styles and returns the corresponding XML tags.
+func formatStylesTags(stylesList []interface{}, funcName string) (string, error) {
 	styles := ""
-	for i := range s {
-		if i == 0 {
-			text = s[i]
-			continue
+	for _, arg := range stylesList {
+		styleParam, ok := arg.(string)
+		if !ok {
+			return "", fmt.Errorf("%s got non-string style parameter: %v", funcName, arg)
 		}
-
-		styleParam := s[i]
 
 		// font size style
 		if strings.HasPrefix(styleParam, FONT_SIZE_STYLE_PREFIX) || strings.HasPrefix(styleParam, FONT_SIZE_STYLE_PREFIX_SHORT) {
 			if strings.Contains(styles, "<w:sz w:val=") {
-				return "", fmt.Errorf("styledText got multiple font size styles")
+				return "", fmt.Errorf("%s got multiple font size styles", funcName)
 			}
 
 			sizeStr := strings.TrimPrefix(styleParam, FONT_SIZE_STYLE_PREFIX)
@@ -114,7 +115,7 @@ func styledText(s ...string) (string, error) {
 
 			ptSize, err := strconv.Atoi(sizeStr)
 			if err != nil {
-				return "", fmt.Errorf("styledText got invalid size: %s", sizeStr)
+				return "", fmt.Errorf("%s got invalid size: %s", funcName, sizeStr)
 			}
 
 			styles += fontSizeWrapperf(ptSize)
@@ -124,7 +125,7 @@ func styledText(s ...string) (string, error) {
 		// color style
 		if strings.HasPrefix(styleParam, "#") {
 			if strings.Contains(styles, "<w:color w:val=") {
-				return "", fmt.Errorf("styledText got multiple color styles")
+				return "", fmt.Errorf("%s got multiple color styles", funcName)
 			}
 
 			hex := strings.ToUpper(strings.TrimPrefix(styleParam, "#"))
@@ -133,28 +134,41 @@ func styledText(s ...string) (string, error) {
 			continue
 		}
 
+		// shading style
+		if strings.HasPrefix(styleParam, TEXT_SHADING_STYLE_PREFIX) {
+			if strings.Contains(styles, "<w:shd w:val=") {
+				return "", fmt.Errorf("%s got multiple background shading styles", funcName)
+			}
+
+			hex := strings.ToUpper(strings.TrimPrefix(styleParam, TEXT_SHADING_STYLE_PREFIX))
+			hex = strings.TrimPrefix(hex, "#")
+
+			styles += fmt.Sprintf(SHADING_W_TAG_F, hex)
+			continue
+		}
+
 		switch styleParam {
 		case "b", "bold":
 			if strings.Contains(styles, BOLD_W_TAG) {
-				return "", fmt.Errorf("styledText got multiple bold styles")
+				return "", fmt.Errorf("%s got multiple bold styles", funcName)
 			}
 
 			styles += BOLD_W_TAG
 		case "i", "italic":
 			if strings.Contains(styles, ITALIC_W_TAG) {
-				return "", fmt.Errorf("styledText got multiple italic styles")
+				return "", fmt.Errorf("%s got multiple italic styles", funcName)
 			}
 
 			styles += ITALIC_W_TAG
 		case "u", "underline":
 			if strings.Contains(styles, UNDERLINE_W_TAG) {
-				return "", fmt.Errorf("styledText got multiple underline styles")
+				return "", fmt.Errorf("%s got multiple underline styles", funcName)
 			}
 
 			styles += UNDERLINE_W_TAG
 		case "s", "strike", "strikethrough":
 			if strings.Contains(styles, STRIKETHROUGH_W_TAG) {
-				return "", fmt.Errorf("styledText got multiple strikethrough styles")
+				return "", fmt.Errorf("%s got multiple strikethrough styles", funcName)
 			}
 
 			styles += STRIKETHROUGH_W_TAG
@@ -164,16 +178,41 @@ func styledText(s ...string) (string, error) {
 			"darkMagenta", "darkRed", "darkYellow",
 			"darkGray", "lightGray", "none":
 			if strings.Contains(styles, "<w:highlight w:val=") {
-				return "", fmt.Errorf("styledText got multiple highlight colors styles")
+				return "", fmt.Errorf("%s got multiple highlight colors styles", funcName)
 			}
 
 			styles += fmt.Sprintf(HIGHLIGHT_W_TAG_F, styleParam)
 		default:
-			return "", fmt.Errorf("styledText got unknown style: %s", s[i])
+			return "", fmt.Errorf("%s got unknown style: %s", funcName, styleParam)
 		}
 	}
 
-	return fmt.Sprintf(STYLE_WRAPPER_F, styles, text), nil
+	return styles, nil
+}
+
+// styledText takes a strings and a slice of styles to apply to the text.
+// You can use this function to style text with a set variable containing
+// a reusable style in your code.
+func styledText(text string, styles []interface{}) (string, error) {
+	stylesTags, err := formatStylesTags(styles, "styledText")
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf(STYLE_WRAPPER_F, stylesTags, text), nil
+}
+
+// inlineStyledText applies multiple styles to the given text.
+// The first argument is the text, the following arguments are styles.
+// You can use this function to apply multiple styles to a text without
+// having to wrap them in a list.
+func inlineStyledText(text string, s ...interface{}) (string, error) {
+	stylesTags, err := formatStylesTags(s, "inlineStyledText")
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf(STYLE_WRAPPER_F, stylesTags, text), nil
 }
 
 // bold makes the text bold
@@ -203,7 +242,7 @@ func fontSize(s string, sizeHalfPoints int) string {
 
 // color sets the font color of the text
 func color(s, hex string) (string, error) {
-	hex = strings.TrimPrefix(hex, "#")
+	hex = strings.ToUpper(strings.TrimPrefix(hex, "#"))
 	return fmt.Sprintf(COLOR_WRAPPER_F, hex, s), nil
 }
 
@@ -234,6 +273,12 @@ func highlight(s, color string) (string, error) {
 	return fmt.Sprintf(HIGHLIGHT_WRAPPER_F, color, s), nil
 }
 
+// shadeTextBg applies a background color to the given text
+func shadeTextBg(s, hex string) string {
+	hex = strings.ToUpper(strings.TrimPrefix(hex, "#"))
+	return fmt.Sprintf(SHADING_WRAPPER_F, hex, s)
+}
+
 // image wraps a placeholder around the given filename for image insertion in the document.
 func image(filename string) string {
 	return fmt.Sprintf("[[IMAGE:%s]]", filename)
@@ -254,11 +299,6 @@ func preserveNewline(s string) string {
 // thus creating a new paragraph for the sequent line.
 func breakParagraph(s string) string {
 	return strings.ReplaceAll(s, "\n", DOCX_BREAKPARAGRAPH_INJECT)
-}
-
-// shadeTextBg applies a background color to the given text
-func shadeTextBg(s, hex string) string {
-	return fmt.Sprintf(RGB_SHADING_WRAPPER_F, hex, s)
 }
 
 // shapeBgFillColor replace fillcolor to shapes

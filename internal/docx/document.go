@@ -82,11 +82,13 @@ func (d *documentMeta) NextRId() uint64 {
 func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap) (*documentMeta, error) {
 	d := documentMeta{
 		templateFuncs: template.FuncMap{
+			"list":             list,
 			"bold":             bold,
 			"italic":           italic,
 			"underline":        underline,
 			"strike":           strike,
 			"fontSize":         fontSize,
+			"inlineStyledText": inlineStyledText,
 			"styledText":       styledText,
 			"color":            color,
 			"highlight":        highlight,
