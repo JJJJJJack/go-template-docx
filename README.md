@@ -27,22 +27,6 @@ The library doesn't change the original files and only reads it into memory to o
 
 # Template functions list
 
-- `list(v ...interface{}) []interface{}`: creates a slice of interface{} from the variadic parameters, useful to pass a slice to the `styledText` function
-  - `{{list "b" "i" "fs:14" "bg:#C0FFEE" "#FF0000"}}`
-- `image(filename string)`: the filename parameter looks for an equal loaded `Media`'s filename
-  - `{{image .ImageFilename}}`
-- `replaceImage(filename string)`: the filename parameter looks for an equal loaded `Media`'s filename, it replaces the image inside a `<w:drawing>...</w:drawing>` block, useful to keep the image size and position
-  - `{{replaceImage .ImageFilename}}` inside the `alt-text` of the image to replace
-- `preserveNewline(text string)`: newlines are treated as `SHIFT + ENTER` input, thus keeping the text in the same paragraph.
-  - `{{preserveNewline .TextWithNewlines}}`
-- `breakParagraph(s string)`: newlines are treated as `ENTER` input, thus creating a new paragraph for the sequent line.
-  - `{{breakParagraph .TextWithNewlines}}`
-- `shapeBgFillColor(hex string)`: changes the shape's background fill color, hex string must be in the format `RRGGBB` or `#RRGGBB`
-  - `{{shapeBgFillColor .ShapeBgHex}}` inside the shape's alt-text
-- `toNumberCell(v any)`: (for excel sheets, like charts) sets the cell type to number, useful to make charts work properly, v can be any type that can be converted to a float64
-  - `{{toNumberCell .Number}}` inside the cell text
-- `tableCellBgColor(hex string)`: changes the table cell background fill color, hex string must be in the format `RRGGBB` or `#RRGGBB`
-  - `{{tableCellBgColor .TableCellBgHex}}` inside the table cell text
 - `inlineStyledText(text string, styles ...interface{})`: applies multiple styles to the given text, the styles parameter must be a variadic list of strings, each string is a style to apply, see the styles list below
   - example: `{{inlineStyledText .Text "b" "i" "fs:14" "bg:#C0FFEE" "#FF0000"}}` to apply bold, italic, 14pt font size, a light blue background color and make the text red 
 - `styledText(text string, styles []interface{})`: applies multiple styles to the given text, the styles parameter must be a slice of strings, each string is a style to apply, see the styles list below
@@ -68,8 +52,24 @@ The library doesn't change the original files and only reads it into memory to o
   - `{{color .Text "FF0000"}}` to apply red color to the text
 - `highlight(s string, color string)`: applies a highlight color to the given text, color string are defined here https://c-rex.net/samples/ooxml/e1/Part4/OOXML_P4_DOCX_ST_HighlightColor_topic_ID0E4PY2.html
   - `{{highlight .Text "yellow"}}` to apply yellow highlight to the text
-- `shadeTextBg(hex string, s string)`: applies a background color to the given text, hex string must be in the format `RRGGBB` or `#RRGGBB`
+- `shadeTextBg(s string, hex string)`: applies a background color to the given text, hex string must be in the format `RRGGBB` or `#RRGGBB`
   - `{{shadeTextBg .TextBgHex .Text}}`
+- `list(v ...interface{}) []interface{}`: creates a slice of interface{} from the variadic parameters, useful to pass a slice to the `styledText` function
+  - `{{list "b" "i" "fs:14" "bg:#C0FFEE" "#FF0000"}}`
+- `image(filename string)`: the filename parameter looks for an equal loaded `Media`'s filename
+  - `{{image .ImageFilename}}`
+- `replaceImage(filename string)`: the filename parameter looks for an equal loaded `Media`'s filename, it replaces the image inside a `<w:drawing>...</w:drawing>` block, useful to keep the image size and position
+  - `{{replaceImage .ImageFilename}}` inside the `alt-text` of the image to replace
+- `preserveNewline(text string)`: newlines are treated as `SHIFT + ENTER` input, thus keeping the text in the same paragraph.
+  - `{{preserveNewline .TextWithNewlines}}`
+- `breakParagraph(text string)`: newlines are treated as `ENTER` input, thus creating a new paragraph for the sequent line.
+  - `{{breakParagraph .TextWithNewlines}}`
+- `shapeBgFillColor(hex string)`: changes the shape's background fill color, hex string must be in the format `RRGGBB` or `#RRGGBB`
+  - `{{shapeBgFillColor .ShapeBgHex}}` inside the shape's alt-text
+- `toNumberCell(v any)`: (for excel sheets, like charts) sets the cell type to number, useful to make charts work properly, v can be any type that can be converted to a float64
+  - `{{toNumberCell .Number}}` inside the cell text
+- `tableCellBgColor(hex string)`: changes the table cell background fill color, hex string must be in the format `RRGGBB` or `#RRGGBB`
+  - `{{tableCellBgColor .TableCellBgHex}}` inside the table cell text
 
 # Usage
 

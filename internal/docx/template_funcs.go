@@ -206,8 +206,8 @@ func styledText(text string, styles []interface{}) (string, error) {
 // The first argument is the text, the following arguments are styles.
 // You can use this function to apply multiple styles to a text without
 // having to wrap them in a list.
-func inlineStyledText(text string, s ...interface{}) (string, error) {
-	stylesTags, err := formatStylesTags(s, "inlineStyledText")
+func inlineStyledText(text string, styles ...interface{}) (string, error) {
+	stylesTags, err := formatStylesTags(styles, "inlineStyledText")
 	if err != nil {
 		return "", err
 	}
@@ -236,8 +236,8 @@ func strike(s string) string {
 }
 
 // fontSize sets the font size of the text
-func fontSize(s string, sizeHalfPoints int) string {
-	return fmt.Sprintf(STYLE_WRAPPER_F, fontSizeWrapperf(sizeHalfPoints), s)
+func fontSize(s string, size int) string {
+	return fmt.Sprintf(STYLE_WRAPPER_F, fontSizeWrapperf(size), s)
 }
 
 // color sets the font color of the text
@@ -291,22 +291,22 @@ func replaceImage(filename string) string {
 
 // preserveNewline newlines are treated as `SHIFT + ENTER` input,
 // thus keeping the text in the same paragraph.
-func preserveNewline(s string) string {
-	return strings.ReplaceAll(s, "\n", DOCX_NEWLINE_INJECT)
+func preserveNewline(text string) string {
+	return strings.ReplaceAll(text, "\n", DOCX_NEWLINE_INJECT)
 }
 
 // breakParagraph newlines are treated as `ENTER` input,
 // thus creating a new paragraph for the sequent line.
-func breakParagraph(s string) string {
-	return strings.ReplaceAll(s, "\n", DOCX_BREAKPARAGRAPH_INJECT)
+func breakParagraph(text string) string {
+	return strings.ReplaceAll(text, "\n", DOCX_BREAKPARAGRAPH_INJECT)
 }
 
 // shapeBgFillColor replace fillcolor to shapes
-func shapeBgFillColor(s string) string {
-	return fmt.Sprintf("[[SHAPE_BG_FILL_COLOR:%s]]", s)
+func shapeBgFillColor(hex string) string {
+	return fmt.Sprintf("[[SHAPE_BG_FILL_COLOR:%s]]", hex)
 }
 
 // tableCellBgColor replace background color of table cells
-func tableCellBgColor(s string) string {
-	return fmt.Sprintf("[[TABLE_CELL_BG_COLOR:%s]]", s)
+func tableCellBgColor(hex string) string {
+	return fmt.Sprintf("[[TABLE_CELL_BG_COLOR:%s]]", hex)
 }
