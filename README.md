@@ -23,6 +23,7 @@ The library doesn't change the original files and only reads it into memory to o
 - supports tables templating
 - supports shapes
 - supports preserving text formatting (color, bold, italic, font size, etc...) when replacing text
+- more...
 
 # Template functions list
 
