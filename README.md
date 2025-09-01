@@ -326,3 +326,28 @@ To use the `replaceImage` function you need to:
 ![](https://github.com/JJJJJJack/jubilant-fortnight/blob/main/go-template-docx/replaceimage3.png)
 4. now when you run the templating engine the image will be replaced while preserving its size, position and other properties
 ![](https://github.com/JJJJJJack/jubilant-fortnight/blob/main/go-template-docx/replaceimage4.png)
+
+
+## Low level APIs
+
+AddPreProcessors adds XML pre-processing map in which the key is the XML file path(e.g., "word/document.xml") and the value is a list of functions that overwrite it sequentially,before the template is applied.
+```go
+		docxTemplate.AddPreProcessors(xml.HandlersMap{
+			"word/document.xml": {
+				func(content string) (string, error) {
+					return strings.ReplaceAll(content, "some string", "some other string"), nil
+				},
+			},
+		})
+```
+
+AddPostProcessors adds XML post-processing map in which the key is the XML file path (e.g., "word/document.xml") and the value is a list of functions that overwrite it sequentially, after the template is applied.
+```go
+		docxTemplate.AddPostProcessors(xml.HandlersMap{
+			"word/document.xml": {
+				func(content string) (string, error) {
+					return strings.ReplaceAll(content, "some text", "some other text"), nil
+				},
+			},
+		})
+```

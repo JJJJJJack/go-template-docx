@@ -109,15 +109,15 @@ func (dt *docxTemplate) AddTemplateFuncs(funcMap template.FuncMap) {
 }
 
 // AddPreProcessors adds XML pre-processing map in which the key is the XML file path
-// (e.g., "word/document.xml") and the value is a list of functions to be applied to that file
-// before the template has been applied.
+// (e.g., "word/document.xml") and the value is a list of functions that overwrite it sequentially,
+// before the template is applied.
 func (dt *docxTemplate) AddPreProcessors(filesPreProcessors xml.HandlersMap) {
 	dt.filesPreProcessors = filesPreProcessors
 }
 
 // AddPostProcessors adds XML post-processing map in which the key is the XML file path
-// (e.g., "word/document.xml") and the value is a list of functions to be applied to that file
-// after the template has been applied.
+// (e.g., "word/document.xml") and the value is a list of functions that overwrite it sequentially,
+// after the template is applied.
 func (dt *docxTemplate) AddPostProcessors(filesPostProcessors xml.HandlersMap) {
 	dt.filesPostProcessors = filesPostProcessors
 }
