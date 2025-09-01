@@ -25,6 +25,25 @@ The library doesn't change the original files and only reads it into memory to o
 - supports preserving text formatting (color, bold, italic, font size, etc...) when replacing text
 - more...
 
+# Released executable usage
+
+```
+Usage: template_docx_os_arch.exe <file.docx> <values.json> [<values2.json> ...]
+
+The output files will have the filename of the json file they are generated from (values.docx, values2.docx ...)
+
+optional flags:
+
+-h, --help: show this help message and exit
+
+--version: show go-template-docx version and exit
+
+--verbose: enable verbose error messages
+
+-i <image.jpg|png>: load an image from disk
+(you can use multiple -i flags, make sure the filenames are unique)
+```
+
 # Template functions list
 
 - `inlineStyledText(text string, styles ...interface{})`: applies multiple styles to the given text, the styles parameter must be a variadic list of strings, each string is a style to apply, see the styles list below
