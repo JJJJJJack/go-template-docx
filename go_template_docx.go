@@ -13,20 +13,22 @@ import (
 	"text/template"
 
 	"github.com/JJJJJJack/go-template-docx/internal/docx"
+	"github.com/JJJJJJack/go-template-docx/xml"
 	goziputils "github.com/JJJJJJack/go-zip-utils"
 )
 
 type docxTemplate struct {
-	outputFilename string
-	bytes          []byte
-	reader         *zip.Reader
-	output         bytes.Buffer
-	rel            *docx.Relationship
-	relMedia       []docx.MediaRel
+	bytes    []byte
+	reader   *zip.Reader
+	output   bytes.Buffer
+	rel      *docx.Relationship
+	relMedia []docx.MediaRel
 	// filename : data
-	media          docx.MediaMap
-	xlsxChartsMeta xlsxChartsMap
-	templateFuncs  template.FuncMap
+	media               docx.MediaMap
+	xlsxChartsMeta      xlsxChartsMap
+	templateFuncs       template.FuncMap
+	filesPreProcessors  xml.HandlersMap
+	filesPostProcessors xml.HandlersMap
 }
 
 // NewDocxTemplateFromBytes creates a new docxTemplate object from the provided DOCX file bytes.
@@ -43,14 +45,16 @@ func NewDocxTemplateFromBytes(docxBytes []byte) (*docxTemplate, error) {
 	}
 
 	return &docxTemplate{
-		outputFilename: "",
-		bytes:          docxBytes,
-		reader:         docxReader,
-		output:         bytes.Buffer{},
-		media:          docx.MediaMap{},
-		rel:            &docx.Relationship{},
-		relMedia:       []docx.MediaRel{},
-		xlsxChartsMeta: make(xlsxChartsMap),
+		bytes:               docxBytes,
+		reader:              docxReader,
+		output:              bytes.Buffer{},
+		media:               docx.MediaMap{},
+		rel:                 &docx.Relationship{},
+		relMedia:            []docx.MediaRel{},
+		xlsxChartsMeta:      make(xlsxChartsMap),
+		templateFuncs:       make(template.FuncMap),
+		filesPreProcessors:  make(xml.HandlersMap),
+		filesPostProcessors: make(xml.HandlersMap),
 	}, nil
 }
 
@@ -74,14 +78,16 @@ func NewDocxTemplateFromFilename(docxFilename string) (*docxTemplate, error) {
 	}
 
 	return &docxTemplate{
-		outputFilename: docxFilename,
-		bytes:          docxBytes,
-		reader:         docxReader,
-		output:         bytes.Buffer{},
-		media:          make(docx.MediaMap),
-		rel:            &docx.Relationship{},
-		relMedia:       []docx.MediaRel{},
-		xlsxChartsMeta: make(xlsxChartsMap),
+		bytes:               docxBytes,
+		reader:              docxReader,
+		output:              bytes.Buffer{},
+		media:               make(docx.MediaMap),
+		rel:                 &docx.Relationship{},
+		relMedia:            []docx.MediaRel{},
+		xlsxChartsMeta:      make(xlsxChartsMap),
+		templateFuncs:       make(template.FuncMap),
+		filesPreProcessors:  make(xml.HandlersMap),
+		filesPostProcessors: make(xml.HandlersMap),
 	}, nil
 }
 
@@ -97,9 +103,23 @@ func (dt *docxTemplate) Media(filename string, data []byte) {
 }
 
 // AddTemplateFuncs adds your custom template functions to evaluate when applying the template.
-// Existing functions will be overwritten if the same name is used.
+// Existing functions will be shadowed if the same name is used.
 func (dt *docxTemplate) AddTemplateFuncs(funcMap template.FuncMap) {
 	dt.templateFuncs = funcMap
+}
+
+// AddPreProcessors adds XML pre-processing map in which the key is the XML file path
+// (e.g., "word/document.xml") and the value is a list of functions to be applied to that file
+// before the template has been applied.
+func (dt *docxTemplate) AddPreProcessors(filesPreProcessors xml.HandlersMap) {
+	dt.filesPreProcessors = filesPreProcessors
+}
+
+// AddPostProcessors adds XML post-processing map in which the key is the XML file path
+// (e.g., "word/document.xml") and the value is a list of functions to be applied to that file
+// after the template has been applied.
+func (dt *docxTemplate) AddPostProcessors(filesPostProcessors xml.HandlersMap) {
+	dt.filesPostProcessors = filesPostProcessors
 }
 
 // Apply applies the template with the provided values to the DOCX file.
@@ -111,6 +131,55 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		if err != nil {
 			return fmt.Errorf("error unmarshalling templateValues: %w", err)
 		}
+	}
+
+	// custom user pre processing
+	if len(dt.filesPreProcessors) > 0 {
+		preZipMap, err := goziputils.NewZipMapFromBytes(dt.bytes)
+		if err != nil {
+			return fmt.Errorf("unable to create DOCX zip map for pre-processing: %w", err)
+		}
+
+		preOutput := bytes.Buffer{}
+
+		preZipWriter := zip.NewWriter(&preOutput)
+
+		for filename, f := range preZipMap {
+			processors := dt.filesPreProcessors[filename]
+			if len(processors) == 0 {
+				err := goziputils.CopyFile(preZipWriter, f)
+				if err != nil {
+					return fmt.Errorf("unable to copy original file '%s' during pre-processing: %w", f.Name, err)
+				}
+
+				continue
+			}
+
+			fileContent, err := goziputils.ReadZipFileContent(f)
+			if err != nil {
+				return fmt.Errorf("unable to read file '%s' for pre-processing: %w", f.Name, err)
+			}
+
+			preOutput := string(fileContent)
+			for _, processor := range processors {
+				preOutput, err = processor(preOutput)
+				if err != nil {
+					return fmt.Errorf("error pre processing file '%s': %w", f.Name, err)
+				}
+			}
+
+			err = goziputils.RewriteFileIntoZipWriter(preZipWriter, f, []byte(preOutput))
+			if err != nil {
+				return fmt.Errorf("unable to rewrite pre-processed file '%s': %w", f.Name, err)
+			}
+		}
+
+		err = preZipWriter.Close()
+		if err != nil {
+			return fmt.Errorf("unable to close zip writer after pre-processing: %w", err)
+		}
+
+		dt.bytes = preOutput.Bytes()
 	}
 
 	zipWriter := zip.NewWriter(&dt.output)
@@ -348,6 +417,54 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 	err = zipWriter.Close()
 	if err != nil {
 		return fmt.Errorf("unable to close zip writer: %w", err)
+	}
+
+	// custom user post processing
+	if len(dt.filesPostProcessors) > 0 {
+		outputPost := bytes.Buffer{}
+		postZipWriter := zip.NewWriter(&outputPost)
+
+		finalZipMap, err := goziputils.NewZipMapFromBytes(dt.output.Bytes())
+		if err != nil {
+			return fmt.Errorf("unable to create final zip map for post-processing: %w", err)
+		}
+
+		for filename, f := range finalZipMap {
+			processors := dt.filesPostProcessors[filename]
+			if len(processors) == 0 {
+				err := goziputils.CopyFile(postZipWriter, f)
+				if err != nil {
+					return fmt.Errorf("unable to copy original file '%s' during post-processing: %w", f.Name, err)
+				}
+
+				continue
+			}
+
+			fileContent, err := goziputils.ReadZipFileContent(f)
+			if err != nil {
+				return fmt.Errorf("unable to read file '%s' for post-processing: %w", f.Name, err)
+			}
+
+			postOutput := string(fileContent)
+			for _, processor := range processors {
+				postOutput, err = processor(postOutput)
+				if err != nil {
+					return fmt.Errorf("error post processing file '%s': %w", f.Name, err)
+				}
+			}
+
+			err = goziputils.RewriteFileIntoZipWriter(postZipWriter, f, []byte(postOutput))
+			if err != nil {
+				return fmt.Errorf("unable to rewrite post-processed file '%s': %w", f.Name, err)
+			}
+		}
+
+		err = postZipWriter.Close()
+		if err != nil {
+			return fmt.Errorf("unable to close zip writer after post-processing: %w", err)
+		}
+
+		dt.output = outputPost
 	}
 
 	return nil
