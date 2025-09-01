@@ -161,15 +161,5 @@ func (d *documentMeta) replaceTableCellBgColors(srcXML string) string {
 		return block
 	})
 
-	// remove empty table rows
-	re := regexp.MustCompile(`<w:tr\b[^>]*>[\s\S]*?</w:tr>`)
-	matches := re.FindAllString(output, -1)
-	for _, match := range matches {
-		if !strings.Contains(match, "<w:t></w:t>") {
-			continue
-		}
-		output = strings.ReplaceAll(output, match, "")
-	}
-
 	return output
 }
