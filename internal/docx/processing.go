@@ -75,29 +75,53 @@ func preserveWhitespaces(data any) any {
 		}
 		return out.Interface()
 
-	case reflect.Slice, reflect.Array:
+	case reflect.Slice:
+		if rv.IsNil() {
+			return data
+		}
 		out := reflect.MakeSlice(rv.Type(), rv.Len(), rv.Len())
 		for i := 0; i < rv.Len(); i++ {
-			elem := preserveWhitespaces(rv.Index(i).Interface())
-			val := reflect.ValueOf(elem)
-			if val.Type().AssignableTo(rv.Type().Elem()) {
-				out.Index(i).Set(val)
-			} else if val.Type().ConvertibleTo(rv.Type().Elem()) {
-				out.Index(i).Set(val.Convert(rv.Type().Elem()))
+			processed := preserveWhitespaces(rv.Index(i).Interface())
+			val := reflect.ValueOf(processed)
+			if val.IsValid() {
+				if val.Type().AssignableTo(rv.Type().Elem()) {
+					out.Index(i).Set(val)
+				} else if val.Type().ConvertibleTo(rv.Type().Elem()) {
+					out.Index(i).Set(val.Convert(rv.Type().Elem()))
+				}
+			}
+		}
+		return out.Interface()
+
+	case reflect.Array:
+		out := reflect.New(rv.Type()).Elem()
+		for i := 0; i < rv.Len(); i++ {
+			processed := preserveWhitespaces(rv.Index(i).Interface())
+			val := reflect.ValueOf(processed)
+			if val.IsValid() {
+				if val.Type().AssignableTo(rv.Type().Elem()) {
+					out.Index(i).Set(val)
+				} else if val.Type().ConvertibleTo(rv.Type().Elem()) {
+					out.Index(i).Set(val.Convert(rv.Type().Elem()))
+				}
 			}
 		}
 		return out.Interface()
 
 	case reflect.Map:
+		if rv.IsNil() {
+			return data
+		}
 		out := reflect.MakeMap(rv.Type())
 		for _, key := range rv.MapKeys() {
-			val := rv.MapIndex(key)
-			processed := preserveWhitespaces(val.Interface())
-			vv := reflect.ValueOf(processed)
-			if vv.Type().AssignableTo(rv.Type().Elem()) {
-				out.SetMapIndex(key, vv)
-			} else if vv.Type().ConvertibleTo(rv.Type().Elem()) {
-				out.SetMapIndex(key, vv.Convert(rv.Type().Elem()))
+			processed := preserveWhitespaces(rv.MapIndex(key).Interface())
+			val := reflect.ValueOf(processed)
+			if val.IsValid() {
+				if val.Type().AssignableTo(rv.Type().Elem()) {
+					out.SetMapIndex(key, val)
+				} else if val.Type().ConvertibleTo(rv.Type().Elem()) {
+					out.SetMapIndex(key, val.Convert(rv.Type().Elem()))
+				}
 			}
 		}
 		return out.Interface()
