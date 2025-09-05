@@ -232,9 +232,9 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 	for filename := range dt.media {
 		ext := path.Ext(filename)
 
-		switch strings.ToLower(ext) {
-		case ".jpg", ".jpeg", "jfif":
-			contentTypes.AddDefaultUnique("jpeg", "image/jpeg")
+		switch lowerExt := strings.ToLower(ext); lowerExt {
+		case ".jpg", ".jpeg", ".jfif":
+			contentTypes.AddDefaultUnique(lowerExt[1:], "image/jpeg")
 		case ".png":
 			contentTypes.AddDefaultUnique("png", "image/png")
 		default:
