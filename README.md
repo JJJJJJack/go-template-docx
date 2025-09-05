@@ -349,24 +349,32 @@ To use the `replaceImage` function you need to:
 
 ## Low level APIs
 
-AddPreProcessors adds XML pre-processing map in which the key is the XML file path(e.g., "word/document.xml") and the value is a list of functions that overwrite it sequentially,before the template is applied.
+AddPreProcessors adds XML pre-processing maps in which the key is the XML file path(e.g., "word/document.xml") and the value is a list of functions that overwrite it sequentially,before the template is applied.
 ```go
-		docxTemplate.AddPreProcessors(xml.HandlersMap{
-			"word/document.xml": {
-				func(content string) (string, error) {
-					return strings.ReplaceAll(content, "some string", "some other string"), nil
-				},
-			},
-		})
+docxTemplate.AddPreProcessors(
+  xml.HandlersMap{
+    "word/document.xml": {
+      func(content string) (string, error) {
+        return strings.ReplaceAll(content, "some string", "some other string"), nil
+      },
+    },
+  },
+  ... // more docx iterations
+)
 ```
 
-AddPostProcessors adds XML post-processing map in which the key is the XML file path (e.g., "word/document.xml") and the value is a list of functions that overwrite it sequentially, after the template is applied.
+AddPostProcessors adds XML post-processing maps in which the key is the XML file path (e.g., "word/document.xml") and the value is a list of functions that overwrite it sequentially, after the template is applied.
 ```go
-		docxTemplate.AddPostProcessors(xml.HandlersMap{
-			"word/document.xml": {
-				func(content string) (string, error) {
-					return strings.ReplaceAll(content, "some text", "some other text"), nil
-				},
-			},
-		})
+docxTemplate.AddPostProcessors(
+  xml.HandlersMap{
+    "word/document.xml": {
+      func(content string) (string, error) {
+        return strings.ReplaceAll(content, "some text", "some other text"), nil
+      },
+    },
+  },
+  ... // more docx iterations
+)
 ```
+
+> You can add more maps here to chain multiple processing steps, for example you may first want to read some specific xml values and after that you iterate over other files to update them based on the previous iteration read values.
