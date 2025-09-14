@@ -72,7 +72,7 @@ optional flags:
 - `highlight(s string, color string)`: applies a highlight color to the given text, color string are defined here https://c-rex.net/samples/ooxml/e1/Part4/OOXML_P4_DOCX_ST_HighlightColor_topic_ID0E4PY2.html
   - `{{highlight .Text "yellow"}}` to apply yellow highlight to the text
 - `shadeTextBg(s string, hex string)`: applies a background color to the given text, hex string must be in the format `RRGGBB` or `#RRGGBB`
-  - `{{shadeTextBg .TextBgHex .Text}}`
+  - `{{shadeTextBg .Text .ColorHex}}`
 - `list(v ...interface{}) []interface{}`: creates a slice of interface{} from the variadic parameters, useful to pass a slice to the `styledText` function
   - `{{list "b" "i" "fs:14" "bg:#C0FFEE" "#FF0000"}}`
 - `image(filename string)`: the filename parameter looks for an equal loaded `Media`'s filename
