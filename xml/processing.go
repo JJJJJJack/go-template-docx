@@ -21,15 +21,15 @@ func ProcessedOutput(filesProcessorsMaps []HandlersMap, outputBuffer *bytes.Buff
 	for _, filesPostProcessorsMap := range filesProcessorsMaps {
 		zipBytes := append([]byte(nil), outputBuffer.Bytes()...)
 
-		finalZipMap, err := goziputils.NewZipMapFromBytes(zipBytes)
+		zipMap, err := goziputils.NewZipMapFromBytes(zipBytes)
 		if err != nil {
-			return fmt.Errorf("unable to create final zip map during %s-processing: %w", preOrPost, err)
+			return fmt.Errorf("unable to create zip map during %s-processing: %w", preOrPost, err)
 		}
 
 		outputBuffer.Reset()
 		outputZipWriter := zip.NewWriter(outputBuffer)
 
-		for filename, f := range finalZipMap {
+		for filename, f := range zipMap {
 			processors := filesPostProcessorsMap[filename]
 			if len(processors) == 0 {
 				if err := goziputils.CopyFile(outputZipWriter, f); err != nil {
