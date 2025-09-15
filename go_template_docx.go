@@ -13,6 +13,7 @@ import (
 	"text/template"
 
 	"github.com/JJJJJJack/go-template-docx/internal/docx"
+	docxtemplate "github.com/JJJJJJack/go-template-docx/internal/template"
 	"github.com/JJJJJJack/go-template-docx/xml"
 	goziputils "github.com/JJJJJJack/go-zip-utils"
 )
@@ -47,7 +48,7 @@ func NewDocxTemplateFromBytes(docxBytes []byte) (*docxTemplate, error) {
 		rel:                 &docx.Relationship{},
 		relMedia:            []docx.MediaRel{},
 		xlsxChartsMeta:      make(xlsxChartsMap),
-		templateFuncs:       make(template.FuncMap),
+		templateFuncs:       docx.TemplateFuncs,
 		filesPreProcessors:  []xml.HandlersMap{},
 		filesPostProcessors: []xml.HandlersMap{},
 	}, nil
@@ -74,7 +75,7 @@ func NewDocxTemplateFromFilename(docxFilename string) (*docxTemplate, error) {
 		rel:                 &docx.Relationship{},
 		relMedia:            []docx.MediaRel{},
 		xlsxChartsMeta:      make(xlsxChartsMap),
-		templateFuncs:       make(template.FuncMap),
+		templateFuncs:       docx.TemplateFuncs,
 		filesPreProcessors:  []xml.HandlersMap{},
 		filesPostProcessors: []xml.HandlersMap{},
 	}, nil
@@ -94,7 +95,9 @@ func (dt *docxTemplate) Media(filename string, data []byte) {
 // AddTemplateFuncs adds your custom template functions to evaluate when applying the template.
 // Existing functions will be shadowed if the same name is used.
 func (dt *docxTemplate) AddTemplateFuncs(funcMap template.FuncMap) {
-	dt.templateFuncs = funcMap
+	for funcName, fn := range funcMap {
+		dt.templateFuncs[funcName] = fn
+	}
 }
 
 // AddPreProcessors adds XML pre-processing maps in which the key is the XML file path
@@ -109,6 +112,35 @@ func (dt *docxTemplate) AddPreProcessors(filesPreProcessors ...xml.HandlersMap) 
 // after the template is applied.
 func (dt *docxTemplate) AddPostProcessors(filesPostProcessors ...xml.HandlersMap) {
 	dt.filesPostProcessors = filesPostProcessors
+}
+
+// GetTemplateVariables extracts and returns all template variables used in the DOCX file
+// as a map.
+func (dt *docxTemplate) GetTemplateVariables() (map[string]struct{}, error) {
+	zipMap, err := goziputils.NewZipMapFromBytes(dt.input.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("unable to create DOCX zip map: %w", err)
+	}
+
+	vars := map[string]struct{}{}
+	for _, f := range zipMap {
+		b, err := goziputils.ReadZipFileContent(f)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read file '%s': %w", f.Name, err)
+		}
+
+		tmpl, err := template.New(path.Base(f.Name)).Funcs(dt.templateFuncs).Parse(docx.PatchXml(string(b)))
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse template in file '%s': %w", f.Name, err)
+		}
+
+		x := docxtemplate.ExtractAllVariables(tmpl)
+		for k := range x {
+			vars[k] = struct{}{}
+		}
+	}
+
+	return vars, nil
 }
 
 // Apply applies the template with the provided values to the DOCX file.

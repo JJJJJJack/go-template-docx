@@ -81,29 +81,7 @@ func (d *documentMeta) NextRId() uint64 {
 // TODO: use xml parsing instead of regex
 func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap) (*documentMeta, error) {
 	d := documentMeta{
-		templateFuncs: template.FuncMap{
-			"list":             list,
-			"bold":             bold,
-			"italic":           italic,
-			"underline":        underline,
-			"strike":           strike,
-			"fontSize":         fontSize,
-			"inlineStyledText": inlineStyledText,
-			"styledText":       styledText,
-			"color":            color,
-			"highlight":        highlight,
-			"preserveNewline":  preserveNewline,
-			"breakParagraph":   breakParagraph,
-			"shadeTextBg":      shadeTextBg,
-			"image":            image,
-			"replaceImage":     replaceImage,
-			"shapeBgFillColor": shapeBgFillColor,
-			"tableCellBgColor": tableCellBgColor,
-		},
-	}
-
-	for funcName, fn := range tf {
-		d.templateFuncs[funcName] = fn
+		templateFuncs: tf,
 	}
 
 	// work on word/document.xml

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"text/template"
 )
 
 type XmlImageData struct {
@@ -309,4 +310,24 @@ func shapeBgFillColor(hex string) string {
 // tableCellBgColor replace background color of table cells
 func tableCellBgColor(hex string) string {
 	return fmt.Sprintf("[[TABLE_CELL_BG_COLOR:%s]]", hex)
+}
+
+var TemplateFuncs = template.FuncMap{
+	"list":             list,
+	"bold":             bold,
+	"italic":           italic,
+	"underline":        underline,
+	"strike":           strike,
+	"fontSize":         fontSize,
+	"inlineStyledText": inlineStyledText,
+	"styledText":       styledText,
+	"color":            color,
+	"highlight":        highlight,
+	"preserveNewline":  preserveNewline,
+	"breakParagraph":   breakParagraph,
+	"shadeTextBg":      shadeTextBg,
+	"image":            image,
+	"replaceImage":     replaceImage,
+	"shapeBgFillColor": shapeBgFillColor,
+	"tableCellBgColor": tableCellBgColor,
 }
