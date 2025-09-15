@@ -379,4 +379,11 @@ docxTemplate.AddPostProcessors(
 )
 ```
 
+GetTemplateVariables returns a map[string]struct{} of all the template variables found in the docx file, useful to debug and check which variables are present in the template.
+```go
+vars := docxTemplate.GetTemplateVariables()
+fmt.Println(vars)
+// Output: map[$var:{} .A:{} .B.C:{} ...]
+```
+
 > You can add more maps here to chain multiple processing steps, for example you may first want to read some specific xml values and after that you iterate over other files to update them based on the previous iteration read values.
