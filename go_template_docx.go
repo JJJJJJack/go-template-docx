@@ -363,7 +363,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		}
 
 		xlsxFileTarget := chartRelToTargetXlsx[chartFilename]
-		fileContent, err = docx.UpdateChart(fileContent, dt.xlsxChartsMeta[xlsxFileTarget].chartNumbers)
+		fileContent, err = docx.UpdateChart(fileContent, dt.xlsxChartsMeta[xlsxFileTarget])
 		if err != nil {
 			return fmt.Errorf("unable to update preview chart file '%s': %w", f.Name, err)
 		}
