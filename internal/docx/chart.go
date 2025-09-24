@@ -32,10 +32,10 @@ func ApplyTemplateToXml(f *zip.File, templateValues any, templateFuncs template.
 		return nil, fmt.Errorf("unable to read chart file '%s': %w", f.Name, err)
 	}
 
-    tmpl, err := template.New(f.Name).
-        Option("missingkey=error").
-        Funcs(templateFuncs).
-        Parse(PatchXml(string(fileContent)))
+	tmpl, err := template.New(f.Name).
+		Option("missingkey=error").
+		Funcs(templateFuncs).
+		Parse(PatchXml(string(fileContent)))
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse template: %w", err)
 	}

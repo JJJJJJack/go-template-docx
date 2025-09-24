@@ -155,10 +155,10 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 
 	documentXml = []byte(PatchXml(string(documentXml)))
 
-    tmpl, err := template.New(f.Name).
-        Option("missingkey=error").
-        Funcs(d.templateFuncs).
-        Parse(string(documentXml))
+	tmpl, err := template.New(f.Name).
+		Option("missingkey=error").
+		Funcs(d.templateFuncs).
+		Parse(string(documentXml))
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse template in file '%s': %w", f.Name, err)
 	}
@@ -184,9 +184,9 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 
 	output = d.replaceTableCellBgColors(output)
 
-    output = flattenNestedTextRuns(output)
+	output = flattenNestedTextRuns(output)
 
-    output = removeEmptyTableRows(output)
+	output = removeEmptyTableRows(output)
 
 	err = goziputils.RewriteFileIntoZipWriter(zipWriter, f, []byte(output))
 	if err != nil {
