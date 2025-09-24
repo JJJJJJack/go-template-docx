@@ -17,7 +17,8 @@ func removeEmptyTableRows(srcXML string) string {
 	// legitimate rows. This refined check keeps rows that visibly render.
 
 	trRe := regexp.MustCompile(`(?s)<w:tr\b[^>]*>.*?</w:tr>`) // match a table row
-	tRe := regexp.MustCompile(`(?is)<w:t[^>]*>(.*?)</w:t>`)   // capture text content
+	// Strictly match the <w:t> tag name (avoid <w:tr>, <w:tc>, <w:tbl>...)
+	tRe := regexp.MustCompile(`(?is)<w:t\b[^>]*>(.*?)</w:t>`) // capture text content
 	visRe := regexp.MustCompile(`(?is)<w:drawing\b|<w:pict\b|<mc:AlternateContent\b|<v:shape\b|<wps:spPr\b`)
 
 	isRowEmpty := func(row string) bool {
@@ -57,7 +58,8 @@ func removeEmptyTableRows(srcXML string) string {
 //
 //	<w:rPr>..</w:rPr><w:t>text</w:t>
 func flattenNestedTextRuns(srcXML string) string {
-	nestedRe := regexp.MustCompile(`(?is)<w:t[^>]*>\s*(<w:rPr>[\s\S]*?</w:rPr>)\s*<w:t[^>]*>([\s\S]*?)</w:t>\s*</w:t>`) // greedy across whitespace
+	// Strictly match <w:t> boundaries to avoid accidentally catching <w:tr>, <w:tc>, etc.
+	nestedRe := regexp.MustCompile(`(?is)<w:t\b[^>]*>\s*(<w:rPr>[\s\S]*?</w:rPr>)\s*<w:t\b[^>]*>([\s\S]*?)</w:t>\s*</w:t>`) // greedy across whitespace
 	for nestedRe.MatchString(srcXML) {
 		srcXML = nestedRe.ReplaceAllString(srcXML, `${1}<w:t>${2}</w:t>`)
 	}
