@@ -104,14 +104,22 @@ func preserveWhitespaces(data any) any {
 		return preserveWhitespaces(rv.Elem().Interface())
 
 	case reflect.Struct:
+		// Preserve original struct value first to avoid zeroing
+		// unexported fields (e.g., time.Time internals).
 		out := reflect.New(rv.Type()).Elem()
+		out.Set(rv)
+
 		for i := 0; i < rv.NumField(); i++ {
 			field := rv.Field(i)
+			// Only attempt to modify exported and settable fields.
 			if !field.CanInterface() || !out.Field(i).CanSet() {
 				continue
 			}
 			processed := preserveWhitespaces(field.Interface())
 			val := reflect.ValueOf(processed)
+			if !val.IsValid() {
+				continue
+			}
 			if val.Type().AssignableTo(out.Field(i).Type()) {
 				out.Field(i).Set(val)
 			} else if val.Type().ConvertibleTo(out.Field(i).Type()) {
