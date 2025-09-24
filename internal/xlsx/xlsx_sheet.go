@@ -10,15 +10,20 @@ import (
 )
 
 // TODO: switch to xml parsing
-func UpdateSheet(fileContent []byte, numberCellsValues map[int]string, sharedStringsNewIndexes map[int]int) ([]byte, []string, error) {
-	re := regexp.MustCompile(`<c[^>]*t="s"[^>]*>.*?<v>(\d+)</v>.*?</c>`)
+func UpdateSheet(fileContent []byte, numberCellsValues map[int]string, sharedStringsNewIndexes map[int]int) ([]byte, map[string]string, error) {
+	// Capture cell reference and shared string index
+	re := regexp.MustCompile(`<c[^>]*r="([^"]+)"[^>]*t="s"[^>]*>.*?<v>(\d+)</v>.*?</c>`)
 	matches := re.FindAllStringSubmatch(string(fileContent), -1)
 
-	valuesOrderedByAppearance := []string{}
+	valuesByCell := make(map[string]string)
+
 	for _, match := range matches {
-		sharedStringIndex, err := strconv.Atoi(match[1])
+		cellRef := match[1]              // A1, B2, ...
+		sharedStringIndexStr := match[2] // original index in <v>...</v>
+
+		sharedStringIndex, err := strconv.Atoi(sharedStringIndexStr)
 		if err != nil {
-			return nil, []string{}, fmt.Errorf("unable to convert index %s to int: %w", match[1], err)
+			return nil, nil, fmt.Errorf("unable to convert index %s to int: %w", sharedStringIndexStr, err)
 		}
 
 		// put number value directly in sheet cell and remove type attribute
@@ -32,7 +37,7 @@ func UpdateSheet(fileContent []byte, numberCellsValues map[int]string, sharedStr
 
 			fileContent = bytes.Replace(fileContent, []byte(match[0]), []byte(replace), 1)
 
-			valuesOrderedByAppearance = append(valuesOrderedByAppearance, numberValue)
+			valuesByCell[cellRef] = numberValue
 		}
 
 		// update shared string index if it has changed
@@ -46,7 +51,7 @@ func UpdateSheet(fileContent []byte, numberCellsValues map[int]string, sharedStr
 		}
 	}
 
-	return fileContent, valuesOrderedByAppearance, nil
+	return fileContent, valuesByCell, nil
 }
 
 // Cell represents a <c> element in sheetN.xml

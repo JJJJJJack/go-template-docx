@@ -5,25 +5,52 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
+	"strconv"
+	"strings"
 	"text/template"
 
 	goziputils "github.com/JJJJJJack/go-zip-utils"
 )
 
 // TODO: parse and unmarshal xml instead of using regex
-func UpdateChart(fileContent []byte, values []string) ([]byte, error) {
-	re := regexp.MustCompile(`<c:val>.*?<c:v>(.*?)</c:v>.*?</c:val>`)
-	matches := re.FindAllSubmatch(fileContent, -1)
+func UpdateChart(fileContent []byte, cellAndValues map[string]string) ([]byte, error) {
+	// the blockRe captures both strCache and numCache because it would otherwise match the first <c:f>...</c:f> with the last <c:numCache>...</c:numCache>
+	blockRe := regexp.MustCompile(`(?s)<c:f>(Sheet\d+!\$([A-Z]+)\$(\d+):\$[A-Z]+\$(\d+))</c:f>.*?<c:(?:strCache|numCache)>(.*?)</c:(?:strCache|numCache)>`)
+	ptRe := regexp.MustCompile(`(?s)<c:pt idx="(\d+)">.*?<c:v>(.*?)</c:v>.*?</c:pt>`)
 
-	if len(matches) == 0 {
-		return fileContent, nil
-	}
+	updated := blockRe.ReplaceAllFunc(fileContent, func(block []byte) []byte {
+		m := blockRe.FindSubmatch(block)
+		if len(m) < 6 {
+			return block
+		}
 
-	for _, value := range values {
-		fileContent = bytes.Replace(fileContent, []byte("<c:v>0</c:v>"), []byte(fmt.Sprintf("<c:v>%s</c:v>", value)), 1)
-	}
+		col := string(m[2])                       // "A"
+		startRow, _ := strconv.Atoi(string(m[3])) // 2
+		cache := string(m[5])                     // contents of <c:strCache> or <c:numCache>
 
-	return fileContent, nil
+		// Iterate over <c:pt>
+		cacheUpdated := ptRe.ReplaceAllStringFunc(cache, func(pt string) string {
+			pm := ptRe.FindStringSubmatch(pt)
+			if len(pm) < 3 {
+				return pt
+			}
+
+			idx, _ := strconv.Atoi(pm[1]) // idx=0,1,2,3...
+			cell := fmt.Sprintf("%s%d", col, startRow+idx)
+
+			if number, ok := cellAndValues[cell]; ok {
+				oldVal := fmt.Sprintf("<c:v>%s</c:v>", pm[2])
+				newVal := fmt.Sprintf("<c:v>%s</c:v>", number)
+				return strings.Replace(pt, oldVal, newVal, 1)
+			}
+			return pt
+		})
+
+		// Put updated cache back
+		return []byte(strings.Replace(string(block), cache, cacheUpdated, 1))
+	})
+
+	return updated, nil
 }
 
 func ApplyTemplateToXml(f *zip.File, templateValues any, templateFuncs template.FuncMap) ([]byte, error) {

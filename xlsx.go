@@ -10,11 +10,9 @@ import (
 	goziputils "github.com/JJJJJJack/go-zip-utils"
 )
 
-type chartData struct {
-	chartNumbers []string
-}
+type chartCellAndValue map[string]string
 
-type xlsxChartsMap map[string]chartData
+type xlsxChartsMap map[string]chartCellAndValue
 
 // modifyXlsxInMemoryFromZipFile modifies an internal file inside an XLSX embedded in a zip.File.
 // It returns a modified XLSX as []byte.
@@ -91,15 +89,13 @@ func (dt *docxTemplate) modifyXlsxInMemoryFromZipFile(xlsxFile *zip.File, templa
 			return nil, fmt.Errorf("error reading zip file content '%s': %w", f.Name, err)
 		}
 
-		var chartValues []string
+		var chartValues map[string]string
 		fileContent, chartValues, err = xlsx.UpdateSheet(fileContent, sharedStringsNumbers, sharedStringsNewIndexes)
 		if err != nil {
 			return nil, fmt.Errorf("error replacing shared strings indexes in file '%s': %w", f.Name, err)
 		}
 
-		dt.xlsxChartsMeta[xlsxFile.Name] = chartData{
-			chartNumbers: chartValues,
-		}
+		dt.xlsxChartsMeta[xlsxFile.Name] = chartValues
 
 		sharedStringsRefs, err := xlsx.GetCountFromXml(fileContent)
 		if err != nil {
