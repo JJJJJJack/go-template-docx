@@ -9,15 +9,7 @@ import (
 
 // removeEmptyTableRows removes empty table rows from the provided XML string.
 func removeEmptyTableRows(srcXML string) string {
-	// A row should be considered "empty" only if it has:
-	// - no non‑whitespace text inside any <w:t>...</w:t>
-	// - and no visual content (drawings/shapes/alternate content blocks)
-	// Word frequently emits empty <w:t></w:t> runs as layout artifacts; removing
-	// any row that merely contains one of those is too aggressive and drops
-	// legitimate rows. This refined check keeps rows that visibly render.
-
 	trRe := regexp.MustCompile(`(?s)<w:tr\b[^>]*>.*?</w:tr>`) // match a table row
-	// Strictly match the <w:t> tag name (avoid <w:tr>, <w:tc>, <w:tbl>...)
 	tRe := regexp.MustCompile(`(?is)<w:t\b[^>]*>(.*?)</w:t>`) // capture text content
 	visRe := regexp.MustCompile(`(?is)<w:drawing\b|<w:pict\b|<mc:AlternateContent\b|<v:shape\b|<wps:spPr\b`)
 
@@ -28,12 +20,11 @@ func removeEmptyTableRows(srcXML string) string {
 
 		texts := tRe.FindAllStringSubmatch(row, -1)
 		if len(texts) == 0 {
-			// No text nodes and no visual content => treat as empty
 			return true
 		}
 
 		for _, m := range texts {
-			if strings.TrimSpace(m[1]) != "" { // any visible char keeps the row
+			if strings.TrimSpace(m[1]) != "" {
 				return false
 			}
 		}
@@ -104,10 +95,8 @@ func preserveWhitespaces(data any) any {
 		return preserveWhitespaces(rv.Elem().Interface())
 
 	case reflect.Struct:
-		// Preserve original struct value first to avoid zeroing
-		// unexported fields (e.g., time.Time internals).
 		out := reflect.New(rv.Type()).Elem()
-		out.Set(rv)
+		out.Set(rv) // Preserve original struct value first to avoid zeroing unexported fields (e.g., time.Time internals).
 
 		for i := 0; i < rv.NumField(); i++ {
 			field := rv.Field(i)
