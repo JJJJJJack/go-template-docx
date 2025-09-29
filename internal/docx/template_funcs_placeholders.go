@@ -89,130 +89,6 @@ func (d *documentMeta) replaceImages(srcXML string) (string, []MediaRel) {
 	return result, mediaRels
 }
 
-const withoutSolidFill = `</a:prstGeom></wps:spPr>`
-const withSolidFill = `</a:prstGeom><a:solidFill><a:srgbClr val="ffffff" /></a:solidFill></wps:spPr>`
-
-// ReplaceAllShapeBgColors finds shapes that contain the [[SHAPE_BG_COLOR:RRGGBB]]/[[SHAPE_BG_COLOR:#RRGGBB]]
-// placeholder and uses its value to replace the fillcolor attribute of the shape
-// TODO: replace with proper XML parsing
-func (d *documentMeta) applyShapesBgFillColor(srcXML string) string {
-    placeholderRe := regexp.MustCompile(`\[\[SHAPE_BG_FILL_COLOR:#?([0-9A-Fa-f]{6})\]\]`)
-
-    altContentRe := regexp.MustCompile(`(?s)<mc:AlternateContent>.*?</mc:AlternateContent>`)
-
-    return altContentRe.ReplaceAllStringFunc(srcXML, func(block string) string {
-        placeholders := placeholderRe.FindAllStringSubmatch(block, -1)
-        if len(placeholders) == 0 {
-            return block
-        }
-
-        for _, pm := range placeholders {
-            hex := strings.ToLower(pm[1])
-
-            // Work only inside <wps:spPr> to target fill and avoid touching line/effect refs
-            spPrRe := regexp.MustCompile(`(?is)<wps:spPr>.*?</wps:spPr>`)
-            block = spPrRe.ReplaceAllStringFunc(block, func(sppr string) string {
-                // Capture existing transform children to preserve visual shading
-                transRe := regexp.MustCompile(`(?is)<a:(?:lumMod|tint|satMod)[^>]*/>`)
-                transforms := strings.Join(transRe.FindAllString(sppr, -1), "")
-                if transforms == "" {
-                    // Fallback to common Word shape shading if none detected
-                    transforms = `<a:lumMod val="10000"/><a:tint val="66000"/><a:satMod val="160000"/>`
-                }
-                // 1) Gradient fill: recolor stops to srgbClr=hex, keep transforms/direction
-                gradFillRe := regexp.MustCompile(`(?is)<a:gradFill\b[\s\S]*?</a:gradFill>`)
-                sppr = gradFillRe.ReplaceAllStringFunc(sppr, func(grad string) string {
-                    schemeToSrgb := regexp.MustCompile(`(?is)<a:schemeClr\b[^>]*>([\s\S]*?)</a:schemeClr>`)
-                    grad = schemeToSrgb.ReplaceAllString(grad, `<a:srgbClr val="`+hex+`">$1</a:srgbClr>`)
-                    srgbValAttrRe := regexp.MustCompile(`(?is)(<a:srgbClr\b[^>]*\bval=")[^"]*(")`)
-                    grad = srgbValAttrRe.ReplaceAllString(grad, `${1}`+hex+`${2}`)
-                    return grad
-                })
-
-                // 2) Solid fill: convert schemeClr to srgbClr and strip transforms for exact color
-                if !strings.Contains(sppr, "<a:gradFill") {
-                    // Ignore existing schemeClr/srgbClr children and rewrite the whole solidFill block
-
-                    // Replace or insert <a:solidFill> with a clean srgb color (no shading transforms)
-                    solidFillRe := regexp.MustCompile(`(?is)<a:solidFill\b[\s\S]*?</a:solidFill>`)
-                    replacement := `<a:solidFill><a:srgbClr val="` + hex + `"/></a:solidFill>`
-                    // Unconditionally replace any existing solidFill, then ensure one exists
-                    sppr = solidFillRe.ReplaceAllString(sppr, replacement)
-                    if !strings.Contains(sppr, `<a:solidFill>`) {
-                        prstGeomCloseRe := regexp.MustCompile(`(?is)</a:prstGeom>\s*`)
-                        if loc := prstGeomCloseRe.FindStringIndex(sppr); loc != nil {
-                            sppr = sppr[:loc[1]] + replacement + sppr[loc[1]:]
-                        } else {
-                            sppr = strings.Replace(sppr, withoutSolidFill, `</a:prstGeom>`+replacement+`</wps:spPr>`, 1)
-                        }
-                    }
-
-                    // Ensure no shading transforms remain inside the solid fill
-                    sppr = regexp.MustCompile(`(?is)<a:(?:lumMod|lumOff|tint|shade|satMod)\b[^>]*/>`).ReplaceAllString(sppr, "")
-                }
-
-                // Do not force transforms back into the solid fill; keep clean solid color
-
-                return sppr
-            })
-
-            // Fix style blocks that might have self-closing srgbClr incorrectly expanded
-            styleFixRe := regexp.MustCompile(`(?is)<wps:style>.*?</wps:style>`)
-            block = styleFixRe.ReplaceAllStringFunc(block, func(style string) string {
-                // Turn `<a:srgbClr ...></a:fillRef>` into `<a:srgbClr .../></a:fillRef>` etc.
-                re := regexp.MustCompile(`(?is)<a:srgbClr([^>]*)>\s*(</a:(?:fillRef|effectRef|fontRef)>)`)
-                style = re.ReplaceAllString(style, `<a:srgbClr$1/>$2`)
-                return style
-            })
-
-            // Leave <wps:style> refs unchanged; spPr fill controls the interior color
-
-            // 2) VML fallback (<v:shape>): update fillcolor and convert gradient <v:fill/> to solid
-            fillColorRe := regexp.MustCompile(`(?i)\bfillcolor="[^"]*"`)
-            block = fillColorRe.ReplaceAllStringFunc(block, func(fc string) string {
-                return `fillcolor="#` + hex + `"`
-            })
-
-            vmlFillRe := regexp.MustCompile(`(?is)<v:fill\b[^>]*/>`) // update VML gradient fill, keep gradient and recolor stops
-            block = vmlFillRe.ReplaceAllStringFunc(block, func(tag string) string {
-                // Extract commonly used attrs to preserve
-                get := func(name string) string {
-                    re := regexp.MustCompile(`(?i)\b` + name + `="([^"]*)"`)
-                    m := re.FindStringSubmatch(tag)
-                    if len(m) == 2 {
-                        return m[1]
-                    }
-                    return ""
-                }
-                rotate := get("rotate")
-                angle := get("angle")
-                focus := get("focus")
-
-                // Compute simple darker/lighter variants to keep a visible gradient
-                base := strings.ToLower(strings.TrimPrefix(hex, "#"))
-                darker := adjustBrightnessHex(base, 0.25, false)
-                lighter := adjustBrightnessHex(base, 0.35, true)
-
-                attrs := []string{`type="gradient"`, `colors="0 #` + darker + `;0.5 #` + base + `;1 #` + lighter + `"`, `color2="#` + lighter + `"`}
-                if rotate != "" {
-                    attrs = append(attrs, `rotate="`+rotate+`"`)
-                }
-                if angle != "" {
-                    attrs = append(attrs, `angle="`+angle+`"`)
-                }
-                if focus != "" {
-                    attrs = append(attrs, `focus="`+focus+`"`)
-                }
-                return `<v:fill ` + strings.Join(attrs, " ") + `/>`
-            })
-        }
-
-        block = placeholderRe.ReplaceAllString(block, "")
-
-        return block
-    })
-}
-
 // adjustBrightnessHex lightens or darkens a hex color by factor (0..1).
 // If lighten is true, moves towards 255; else towards 0.
 func adjustBrightnessHex(hex string, factor float64, lighten bool) string {
@@ -242,6 +118,129 @@ func adjustBrightnessHex(hex string, factor float64, lighten bool) string {
 		return uint8(x + 0.5)
 	}
 	return fmt.Sprintf("%02x%02x%02x", clamp(rf), clamp(gf), clamp(bf))
+}
+
+const withoutSolidFill = `</a:prstGeom></wps:spPr>`
+const withSolidFill = `</a:prstGeom><a:solidFill><a:srgbClr val="ffffff" /></a:solidFill></wps:spPr>`
+
+// ReplaceAllShapeBgColors finds shapes that contain the [[SHAPE_BG_COLOR:RRGGBB]]/[[SHAPE_BG_COLOR:#RRGGBB]]
+// placeholder and uses its value to replace the fillcolor attribute of the shape
+// TODO: replace with proper XML parsing
+func (d *documentMeta) applyShapesBgFillColor(srcXML string) string {
+	placeholderRe := regexp.MustCompile(`\[\[SHAPE_BG_FILL_COLOR:#?([0-9A-Fa-f]{6})\]\]`)
+
+	altContentRe := regexp.MustCompile(`(?s)<mc:AlternateContent>.*?</mc:AlternateContent>`)
+
+	return altContentRe.ReplaceAllStringFunc(srcXML, func(block string) string {
+		placeholders := placeholderRe.FindAllStringSubmatch(block, -1)
+		if len(placeholders) == 0 {
+			return block
+		}
+
+		for _, pm := range placeholders {
+			hex := strings.ToLower(pm[1])
+
+			// Work only inside <wps:spPr> to target fill and avoid touching line/effect refs
+			wpsSpPrRe := regexp.MustCompile(`(?is)<wps:spPr>.*?</wps:spPr>`)
+			block = wpsSpPrRe.ReplaceAllStringFunc(block, func(sppr string) string {
+				// Capture existing transform children to preserve visual shading
+				transRe := regexp.MustCompile(`(?is)<a:(?:lumMod|tint|satMod)[^>]*/>`)
+				transforms := strings.Join(transRe.FindAllString(sppr, -1), "")
+				if transforms == "" {
+					// Fallback to common Word shape shading if none detected
+					transforms = `<a:lumMod val="10000"/><a:tint val="66000"/><a:satMod val="160000"/>`
+				}
+
+				// Gradient fill: recolor stops to srgbClr=hex, keep transforms/direction
+				gradFillRe := regexp.MustCompile(`(?is)<a:gradFill\b[\s\S]*?</a:gradFill>`)
+				sppr = gradFillRe.ReplaceAllStringFunc(sppr, func(grad string) string {
+					schemeToSrgb := regexp.MustCompile(`(?is)<a:schemeClr\b[^>]*>([\s\S]*?)</a:schemeClr>`)
+					grad = schemeToSrgb.ReplaceAllString(grad, `<a:srgbClr val="`+hex+`">$1</a:srgbClr>`)
+					srgbValAttrRe := regexp.MustCompile(`(?is)(<a:srgbClr\b[^>]*\bval=")[^"]*(")`)
+					grad = srgbValAttrRe.ReplaceAllString(grad, `${1}`+hex+`${2}`)
+					return grad
+				})
+
+				// Solid fill: convert schemeClr to srgbClr and strip transforms for exact color
+				if !strings.Contains(sppr, "<a:gradFill") {
+					// Ignore existing schemeClr/srgbClr children and rewrite the whole solidFill block
+
+					// Replace or insert <a:solidFill> with a clean srgb color (no shading transforms)
+					solidFillRe := regexp.MustCompile(`(?is)<a:solidFill\b[\s\S]*?</a:solidFill>`)
+					replacement := `<a:solidFill><a:srgbClr val="` + hex + `"/></a:solidFill>`
+					// Unconditionally replace any existing solidFill, then ensure one exists
+					sppr = solidFillRe.ReplaceAllString(sppr, replacement)
+					if !strings.Contains(sppr, `<a:solidFill>`) {
+						prstGeomCloseRe := regexp.MustCompile(`(?is)</a:prstGeom>\s*`)
+						if loc := prstGeomCloseRe.FindStringIndex(sppr); loc != nil {
+							sppr = sppr[:loc[1]] + replacement + sppr[loc[1]:]
+						} else {
+							sppr = strings.Replace(sppr, withoutSolidFill, `</a:prstGeom>`+replacement+`</wps:spPr>`, 1)
+						}
+					}
+
+					// Ensure no shading transforms remain inside the solid fill
+					sppr = regexp.MustCompile(`(?is)<a:(?:lumMod|lumOff|tint|shade|satMod)\b[^>]*/>`).ReplaceAllString(sppr, "")
+				}
+
+				// Do not force transforms back into the solid fill; keep clean solid color
+
+				return sppr
+			})
+
+			// Fix style blocks that might have self-closing srgbClr incorrectly expanded
+			styleFixRe := regexp.MustCompile(`(?is)<wps:style>.*?</wps:style>`)
+			block = styleFixRe.ReplaceAllStringFunc(block, func(style string) string {
+				// Turn `<a:srgbClr ...></a:fillRef>` into `<a:srgbClr .../></a:fillRef>` etc.
+				re := regexp.MustCompile(`(?is)<a:srgbClr([^>]*)>\s*(</a:(?:fillRef|effectRef|fontRef)>)`)
+				style = re.ReplaceAllString(style, `<a:srgbClr$1/>$2`)
+				return style
+			})
+
+			// Leave <wps:style> refs unchanged; spPr fill controls the interior color
+
+			// VML fallback (<v:shape>): update fillcolor and convert gradient <v:fill/> to solid
+			fillColorRe := regexp.MustCompile(`(?i)\bfillcolor="[^"]*"`)
+			block = fillColorRe.ReplaceAllStringFunc(block, func(fc string) string {
+				return `fillcolor="#` + hex + `"`
+			})
+
+			vmlFillRe := regexp.MustCompile(`(?is)<v:fill\b[^>]*/>`) // update VML gradient fill, keep gradient and recolor stops
+			block = vmlFillRe.ReplaceAllStringFunc(block, func(tag string) string {
+				getShapeAttr := func(name string) string {
+					re := regexp.MustCompile(`(?i)\b` + name + `="([^"]*)"`)
+					m := re.FindStringSubmatch(tag)
+					if len(m) == 2 {
+						return m[1]
+					}
+					return ""
+				}
+				rotate := getShapeAttr("rotate")
+				angle := getShapeAttr("angle")
+				focus := getShapeAttr("focus")
+
+				base := strings.ToLower(strings.TrimPrefix(hex, "#"))
+				darker := adjustBrightnessHex(base, 0.25, false)
+				lighter := adjustBrightnessHex(base, 0.35, true)
+
+				attrs := []string{`type="gradient"`, `colors="0 #` + darker + `;0.5 #` + base + `;1 #` + lighter + `"`, `color2="#` + lighter + `"`}
+				if rotate != "" {
+					attrs = append(attrs, `rotate="`+rotate+`"`)
+				}
+				if angle != "" {
+					attrs = append(attrs, `angle="`+angle+`"`)
+				}
+				if focus != "" {
+					attrs = append(attrs, `focus="`+focus+`"`)
+				}
+				return `<v:fill ` + strings.Join(attrs, " ") + `/>`
+			})
+		}
+
+		block = placeholderRe.ReplaceAllString(block, "")
+
+		return block
+	})
 }
 
 const withoutShading = `></w:tcPr>`
