@@ -243,8 +243,12 @@ func fontSize(s string, size int) string {
 
 // color sets the font color of the text
 func color(s, hex string) (string, error) {
-	hex = strings.ToUpper(strings.TrimPrefix(hex, "#"))
-	return fmt.Sprintf(COLOR_WRAPPER_F, hex, s), nil
+	hex = strings.TrimPrefix(hex, "#")
+	if len(hex) != 6 {
+		return "", fmt.Errorf("func 'color': invalid hex color value: %s (must be 6 characters like '0077FF')", hex)
+	}
+
+	return fmt.Sprintf(COLOR_WRAPPER_F, strings.ToUpper(hex), s), nil
 }
 
 // highlight applies a highlight color to the text
@@ -268,16 +272,20 @@ func highlight(s, color string) (string, error) {
 	case "lightGray":
 	case "none":
 	default:
-		return "", fmt.Errorf("highlight: invalid highlight color value: %s", color)
+		return "", fmt.Errorf("func 'highlight': invalid highlight color value: %s", color)
 	}
 
 	return fmt.Sprintf(HIGHLIGHT_WRAPPER_F, color, s), nil
 }
 
 // shadeTextBg applies a background color to the given text
-func shadeTextBg(s, hex string) string {
-	hex = strings.ToUpper(strings.TrimPrefix(hex, "#"))
-	return fmt.Sprintf(SHADING_WRAPPER_F, hex, s)
+func shadeTextBg(s, hex string) (string, error) {
+	hex = strings.TrimPrefix(hex, "#")
+	if len(hex) != 6 {
+		return "", fmt.Errorf("func 'shadeTextBg': invalid hex color value: %s (must be 6 characters like '0077FF')", hex)
+	}
+
+	return fmt.Sprintf(SHADING_WRAPPER_F, strings.ToUpper(hex), s), nil
 }
 
 // image wraps a placeholder around the given filename for image insertion in the document.
@@ -303,13 +311,23 @@ func breakParagraph(text string) string {
 }
 
 // shapeBgFillColor replace fillcolor to shapes
-func shapeBgFillColor(hex string) string {
-	return fmt.Sprintf("[[SHAPE_BG_FILL_COLOR:%s]]", hex)
+func shapeBgFillColor(hex string) (string, error) {
+	hex = strings.TrimPrefix(hex, "#")
+	if len(hex) != 6 {
+		return "", fmt.Errorf("func 'shapeBgFillColor': invalid hex color value: %s  (must be 6 characters like '0077FF')", hex)
+	}
+
+	return fmt.Sprintf("[[SHAPE_BG_FILL_COLOR:%s]]", strings.ToUpper(hex)), nil
 }
 
 // tableCellBgColor replace background color of table cells
-func tableCellBgColor(hex string) string {
-	return fmt.Sprintf("[[TABLE_CELL_BG_COLOR:%s]]", hex)
+func tableCellBgColor(hex string) (string, error) {
+	hex = strings.TrimPrefix(hex, "#")
+	if len(hex) != 6 {
+		return "", fmt.Errorf("func 'tableCellBgColor': invalid hex color value: %s  (must be 6 characters like '0077FF')", hex)
+	}
+
+	return fmt.Sprintf("[[TABLE_CELL_BG_COLOR:%s]]", strings.ToUpper(hex)), nil
 }
 
 var TemplateFuncs = template.FuncMap{
