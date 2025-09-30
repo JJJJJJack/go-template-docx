@@ -12,6 +12,7 @@ import (
 // ApplyTemplateToCells applies the templateValues to the given file content and returns the modified content.
 func ApplyTemplateToCells(f *zip.File, templateValues any, fileContent []byte) ([]byte, error) {
 	tmpl, err := template.New(f.Name).
+		Option("missingkey=error").
 		Funcs(template.FuncMap{
 			"toNumberCell": ToNumberCell,
 		}).

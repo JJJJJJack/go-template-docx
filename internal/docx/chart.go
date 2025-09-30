@@ -60,6 +60,7 @@ func ApplyTemplateToXml(f *zip.File, templateValues any, templateFuncs template.
 	}
 
 	tmpl, err := template.New(f.Name).
+		Option("missingkey=error").
 		Funcs(templateFuncs).
 		Parse(PatchXml(string(fileContent)))
 	if err != nil {

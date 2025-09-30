@@ -156,6 +156,7 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 	documentXml = []byte(PatchXml(string(documentXml)))
 
 	tmpl, err := template.New(f.Name).
+		Option("missingkey=error").
 		Funcs(d.templateFuncs).
 		Parse(string(documentXml))
 	if err != nil {
@@ -182,6 +183,8 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 	output = d.applyShapesBgFillColor(output)
 
 	output = d.replaceTableCellBgColors(output)
+
+	output = flattenNestedTextRuns(output)
 
 	output = removeEmptyTableRows(output)
 

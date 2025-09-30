@@ -9,15 +9,51 @@ import (
 
 // removeEmptyTableRows removes empty table rows from the provided XML string.
 func removeEmptyTableRows(srcXML string) string {
-	re := regexp.MustCompile(`<w:tr\b[^>]*>[\s\S]*?</w:tr>`)
-	matches := re.FindAllString(srcXML, -1)
-	for _, match := range matches {
-		if !strings.Contains(match, "<w:t></w:t>") {
-			continue
+	trRe := regexp.MustCompile(`(?s)<w:tr\b[^>]*>.*?</w:tr>`) // match a table row
+	tRe := regexp.MustCompile(`(?is)<w:t\b[^>]*>(.*?)</w:t>`) // capture text content
+	visRe := regexp.MustCompile(`(?is)<w:drawing\b|<w:pict\b|<mc:AlternateContent\b|<v:shape\b|<wps:spPr\b`)
+
+	isRowEmpty := func(row string) bool {
+		if visRe.MatchString(row) {
+			return false
 		}
-		srcXML = strings.ReplaceAll(srcXML, match, "")
+
+		texts := tRe.FindAllStringSubmatch(row, -1)
+		if len(texts) == 0 {
+			return true
+		}
+
+		for _, m := range texts {
+			if strings.TrimSpace(m[1]) != "" {
+				return false
+			}
+		}
+		return true
 	}
 
+	return trRe.ReplaceAllStringFunc(srcXML, func(row string) string {
+		if isRowEmpty(row) {
+			return ""
+		}
+		return row
+	})
+}
+
+// flattenNestedTextRuns fixes cases where a template function that returns
+// `<w:rPr>..</w:rPr><w:t>..</w:t>` got injected inside an existing `<w:t>`.
+// That produces invalid nesting like:
+//
+//	<w:t> <w:rPr>..</w:rPr><w:t>text</w:t> </w:t>
+//
+// Replace it with:
+//
+//	<w:rPr>..</w:rPr><w:t>text</w:t>
+func flattenNestedTextRuns(srcXML string) string {
+	// Strictly match <w:t> boundaries to avoid accidentally catching <w:tr>, <w:tc>, etc.
+	nestedRe := regexp.MustCompile(`(?is)<w:t\b[^>]*>\s*(<w:rPr>[\s\S]*?</w:rPr>)\s*<w:t\b[^>]*>([\s\S]*?)</w:t>\s*</w:t>`) // greedy across whitespace
+	for nestedRe.MatchString(srcXML) {
+		srcXML = nestedRe.ReplaceAllString(srcXML, `${1}<w:t>${2}</w:t>`)
+	}
 	return srcXML
 }
 
@@ -60,13 +96,19 @@ func preserveWhitespaces(data any) any {
 
 	case reflect.Struct:
 		out := reflect.New(rv.Type()).Elem()
+		out.Set(rv) // Preserve original struct value first to avoid zeroing unexported fields (e.g., time.Time internals).
+
 		for i := 0; i < rv.NumField(); i++ {
 			field := rv.Field(i)
+			// Only attempt to modify exported and settable fields.
 			if !field.CanInterface() || !out.Field(i).CanSet() {
 				continue
 			}
 			processed := preserveWhitespaces(field.Interface())
 			val := reflect.ValueOf(processed)
+			if !val.IsValid() {
+				continue
+			}
 			if val.Type().AssignableTo(out.Field(i).Type()) {
 				out.Field(i).Set(val)
 			} else if val.Type().ConvertibleTo(out.Field(i).Type()) {
