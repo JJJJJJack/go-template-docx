@@ -8,8 +8,6 @@
 
 ```diff
 ! the `“/"` problem: if you have issues with using template expressions with constant values passed inline check that you are not using the default double quotes for word `“` or `”` instead of using the ascii double quote `"`, this breaks the golang template library making it not unable to take arguments
-
-! time.Time parameters are lost in-between internals of the library, specifically when preserving whitespaces with a recursive reflection parsing and patching. As a workaround, for now, use a formatted string to show it correctly
 ```
 
 go-template-docx is based on the golang template standard library, thus it inherits its templating syntax to parse tokens inside the docx file.
