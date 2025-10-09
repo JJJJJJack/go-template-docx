@@ -3,6 +3,7 @@ package docx
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/xml"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -19,7 +20,10 @@ type documentMeta struct {
 	// greaterWP14DocId       uint64
 	greaterPictureNumber uint64
 	// greaterChartNumber     uint64
-	templateFuncs template.FuncMap
+	maxWidthInches  float64
+	maxHeightInches float64
+	templateFuncs   template.FuncMap
+	mediaMap        MediaMap
 }
 
 const DOC_PR_ID_ROOF = 2_147_483_647 // docx id attributes are 32-bit signed integers
@@ -78,10 +82,44 @@ func (d *documentMeta) NextRId() uint64 {
 	return d.greaterRId
 }
 
+type sectPr struct {
+	PgSz struct {
+		W int `xml:"w,attr"`
+		H int `xml:"h,attr"`
+	} `xml:"pgSz"`
+	PgMar struct {
+		Top    int `xml:"top,attr"`
+		Bottom int `xml:"bottom,attr"`
+		Left   int `xml:"left,attr"`
+		Right  int `xml:"right,attr"`
+	} `xml:"pgMar"`
+}
+
+type document struct {
+	SectPr sectPr `xml:"body>sectPr"`
+}
+
+const (
+	twipsPerInch = 1440.0
+)
+
+func parseDocumentSettings(docXML []byte) (usableWidthInches, usableHeightInches float64, err error) {
+	var doc document
+	if err = xml.Unmarshal(docXML, &doc); err != nil {
+		return 0, 0, fmt.Errorf("failed to parse document.xml: %w", err)
+	}
+
+	usableWidthInches = float64(doc.SectPr.PgSz.W-doc.SectPr.PgMar.Left-doc.SectPr.PgMar.Right) / twipsPerInch
+	usableHeightInches = float64(doc.SectPr.PgSz.H-doc.SectPr.PgMar.Top-doc.SectPr.PgMar.Bottom) / twipsPerInch
+
+	return usableWidthInches, usableHeightInches, nil
+}
+
 // TODO: use xml parsing instead of regex
-func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap) (*documentMeta, error) {
+func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap, mediaMap MediaMap) (*documentMeta, error) {
 	d := documentMeta{
 		templateFuncs: tf,
+		mediaMap:      mediaMap,
 	}
 
 	// work on word/document.xml
@@ -94,6 +132,11 @@ func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap) (*documentMeta
 	documentContent, err := goziputils.ReadZipFileContent(documentFile)
 	if err != nil {
 		return nil, fmt.Errorf("error reading zip file content: %w", err)
+	}
+
+	d.maxWidthInches, d.maxHeightInches, err = parseDocumentSettings(documentContent)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse document settings: %w", err)
 	}
 
 	idAndPictureNRegEx := regexp.MustCompile(`<wp:docPr\s+id="(\d+)"\s+name="Picture\s+(\d+)"\s*/>`)

@@ -75,7 +75,7 @@ optional flags:
   - `{{shadeTextBg .Text .ColorHex}}`
 - `list(v ...interface{}) []interface{}`: creates a slice of interface{} from the variadic parameters, useful to pass a slice to the `styledText` function
   - `{{list "b" "i" "fs:14" "bg:#C0FFEE" "#FF0000"}}`
-- `image(filename string)`: the filename parameter looks for an equal loaded `Media`'s filename
+- `image(filename string)`: keeps original aspect ratio, the filename parameter looks for an equal loaded `Media`'s filename
   - `{{image .ImageFilename}}`
 - `replaceImage(filename string)`: the filename parameter looks for an equal loaded `Media`'s filename, it replaces the image inside a `<w:drawing>...</w:drawing>` block, useful to keep the image size and position
   - `{{replaceImage .ImageFilename}}` inside the `alt-text` of the image to replace

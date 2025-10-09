@@ -33,10 +33,22 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 			return srcXML, mediaRels, err
 		}
 
+		v, ok := d.mediaMap[filename]
+		if !ok {
+			return srcXML, mediaRels, fmt.Errorf("filename '%s' not found in loaded medias", filename)
+		}
+
+		cx, cy, err := d.computeDocxImageSize(v)
+		if err != nil {
+			return srcXML, mediaRels, fmt.Errorf("unable to compute image size for '%s': %w", filename, err)
+		}
+
 		err = imageTemplate.Execute(&buffer, XmlImageData{
 			DocPrId: docPrId,
 			Name:    filename,
 			RefID:   rId,
+			Cx:      cx,
+			Cy:      cy,
 		})
 		if err != nil {
 			return srcXML, mediaRels, fmt.Errorf("unable to execute image template: %w", err)

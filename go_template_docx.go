@@ -169,7 +169,7 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		return fmt.Errorf("unable to create DOCX zip map: %w", err)
 	}
 
-	document, err := docx.ParseDocumentMeta(docxZipMap, dt.templateFuncs)
+	document, err := docx.ParseDocumentMeta(docxZipMap, dt.templateFuncs, dt.media)
 	if err != nil {
 		return fmt.Errorf("unable to parse document metadata: %w", err)
 	}

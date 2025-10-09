@@ -11,6 +11,8 @@ type XmlImageData struct {
 	DocPrId uint32
 	Name    string
 	RefID   string
+	Cx      int
+	Cy      int
 }
 
 const imageTemplateXml = `<w:drawing>
@@ -19,7 +21,7 @@ const imageTemplateXml = `<w:drawing>
     xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
     xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"
     xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-    <wp:extent cx="2489026" cy="2489026" />
+    <wp:extent cx="{{.Cx}}" cy="{{.Cy}}" />
     <wp:docPr id="{{.DocPrId}}" name="{{.Name}}" />
     <a:graphic>
       <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
@@ -37,7 +39,7 @@ const imageTemplateXml = `<w:drawing>
           <pic:spPr>
             <a:xfrm>
               <a:off x="0" y="0" />
-              <a:ext cx="2489026" cy="2489026" />
+              <a:ext cx="{{.Cx}}" cy="{{.Cy}}" />
             </a:xfrm>
             <a:prstGeom prst="rect">
               <a:avLst />
