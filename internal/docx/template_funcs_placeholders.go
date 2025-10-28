@@ -43,9 +43,10 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 			return srcXML, mediaRels, fmt.Errorf("unable to compute image size for '%s': %w", filename, err)
 		}
 
+		pictureN := fmt.Sprintf("Picture %d", d.NextPictureNumber())
 		err = imageTemplate.Execute(&buffer, XmlImageData{
 			DocPrId: docPrId,
-			Name:    filename,
+			Name:    pictureN,
 			RefID:   rId,
 			Cx:      cx,
 			Cy:      cy,
