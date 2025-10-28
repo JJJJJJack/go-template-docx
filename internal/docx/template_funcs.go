@@ -27,7 +27,7 @@ const imageTemplateXml = `<w:drawing>
       <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
         <pic:pic>
           <pic:nvPicPr>
-            <pic:cNvPr id="0" name="{{.Name}}" />
+            <pic:cNvPr id="{{.DocPrId}}" name="{{.Name}}" />
             <pic:cNvPicPr />
           </pic:nvPicPr>
           <pic:blipFill>
