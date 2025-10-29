@@ -38,7 +38,7 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 			return srcXML, mediaRels, fmt.Errorf("filename '%s' not found in loaded medias", filename)
 		}
 
-		cx, cy, err := d.computeDocxImageSize(v)
+		cx, cy, err := d.computeDocxImageSize(v.Data)
 		if err != nil {
 			return srcXML, mediaRels, fmt.Errorf("unable to compute image size for '%s': %w", filename, err)
 		}
@@ -58,7 +58,7 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 		mediaRels = append(mediaRels, MediaRel{
 			Type:   ImageMediaType,
 			RefID:  rId,
-			Source: path.Join("media", filename),
+			Source: path.Join("media", v.WordFilename),
 		})
 
 		srcXML = strings.ReplaceAll(srcXML, xmlBlock, buffer.String())
@@ -91,7 +91,7 @@ func (d *documentMeta) replaceImages(srcXML string) (string, []MediaRel) {
 		mediaRels = append(mediaRels, MediaRel{
 			Type:   ImageMediaType,
 			RefID:  rId,
-			Source: path.Join("media", filename),
+			Source: path.Join("media", d.mediaMap[filename].WordFilename),
 		})
 
 		block = blipRe.ReplaceAllString(block, "${1}"+rId+"${2}")

@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"path"
 	"regexp"
 	"strconv"
+	"strings"
 	"text/template"
 
 	goziputils "github.com/JJJJJJack/go-zip-utils"
@@ -20,10 +22,11 @@ type documentMeta struct {
 	// greaterWP14DocId       uint64
 	greaterPictureNumber uint64
 	// greaterChartNumber     uint64
-	maxWidthInches  float64
-	maxHeightInches float64
-	templateFuncs   template.FuncMap
-	mediaMap        MediaMap
+	greaterImageNumber uint64
+	maxWidthInches     float64
+	maxHeightInches    float64
+	templateFuncs      template.FuncMap
+	mediaMap           MediaMap
 }
 
 const DOC_PR_ID_ROOF = 2_147_483_647 // docx id attributes are 32-bit signed integers
@@ -77,9 +80,18 @@ func (d *documentMeta) NextPictureNumber() uint64 {
 	return d.greaterPictureNumber
 }
 
+func (d *documentMeta) NextImageNumber() uint64 {
+	d.greaterImageNumber++
+	return d.greaterImageNumber
+}
+
 func (d *documentMeta) NextRId() uint64 {
 	d.greaterRId++
 	return d.greaterRId
+}
+
+func (d *documentMeta) SetMediaMap(mm MediaMap) {
+	d.mediaMap = mm
 }
 
 type sectPr struct {
@@ -116,10 +128,9 @@ func parseDocumentSettings(docXML []byte) (usableWidthInches, usableHeightInches
 }
 
 // TODO: use xml parsing instead of regex
-func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap, mediaMap MediaMap) (*documentMeta, error) {
+func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap) (*documentMeta, error) {
 	d := documentMeta{
 		templateFuncs: tf,
-		mediaMap:      mediaMap,
 	}
 
 	// work on word/document.xml
@@ -184,6 +195,25 @@ func ParseDocumentMeta(zm goziputils.ZipMap, tf template.FuncMap, mediaMap Media
 
 		if num > d.greaterRId {
 			d.greaterRId = num
+		}
+	}
+
+	// work on word/media/images
+	for filename := range zm {
+		if !strings.HasPrefix(filename, "word/media/image") {
+			continue
+		}
+
+		imageNumberStr := strings.TrimPrefix(filename, "word/media/image")
+		imageNumberStr = strings.TrimSuffix(imageNumberStr, path.Ext(filename))
+
+		imageNumber, err := strconv.ParseUint(imageNumberStr, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse image number from filename '%s': %w", filename, err)
+		}
+
+		if imageNumber > d.greaterImageNumber {
+			d.greaterImageNumber = imageNumber
 		}
 	}
 

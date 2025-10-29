@@ -23,7 +23,7 @@ type docxTemplate struct {
 	output   bytes.Buffer
 	rel      *docx.Relationship
 	relMedia []docx.MediaRel
-	// filename : data
+	// filename : { data, wordFilename }
 	media               docx.MediaMap
 	xlsxChartsMeta      xlsxChartsMap
 	templateFuncs       template.FuncMap
@@ -89,7 +89,10 @@ func NewDocxTemplateFromFilename(docxFilename string) (*docxTemplate, error) {
 func (dt *docxTemplate) Media(filename string, data []byte) {
 	filename = filepath.Base(filename)
 
-	dt.media[filename] = data
+	dt.media[filename] = &docx.Media{
+		Data: data,
+		// Word media folder name (e.g., "image1.png") will be assigned after parsing the document metadata
+	}
 }
 
 // AddTemplateFuncs adds your custom template functions to evaluate when applying the template.
@@ -169,10 +172,26 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 		return fmt.Errorf("unable to create DOCX zip map: %w", err)
 	}
 
-	document, err := docx.ParseDocumentMeta(docxZipMap, dt.templateFuncs, dt.media)
+	document, err := docx.ParseDocumentMeta(docxZipMap, dt.templateFuncs)
 	if err != nil {
 		return fmt.Errorf("unable to parse document metadata: %w", err)
 	}
+
+	// put loaded medias into the new docx file, following docx naming convention with sequential numbers
+	for filename, media := range dt.media {
+		// assign each filename to its word convention equivalent path "word/media/imageN.ext"
+		imageN := document.NextImageNumber()
+		wordFilename := fmt.Sprintf("image%d%s", imageN, path.Ext(filename))
+
+		dt.media[filename].WordFilename = wordFilename
+
+		filepath := path.Join("word/media", media.WordFilename)
+		err := goziputils.WriteFile(zipWriter, filepath, media.Data)
+		if err != nil {
+			return fmt.Errorf("unable to write media file '%s': %w", filepath, err)
+		}
+	}
+	document.SetMediaMap(dt.media)
 
 	// Copy all files except the ones that will be processed
 	documentRelsFilename := "word/_rels/document.xml.rels"
@@ -231,15 +250,6 @@ func (dt *docxTemplate) Apply(templateValues any) error {
 	err = goziputils.RewriteFileIntoZipWriter(zipWriter, ctFile, []byte(updatedCt))
 	if err != nil {
 		return fmt.Errorf("unable to replace content types file '%s': %w", ctFile.Name, err)
-	}
-
-	// Put loaded medias into the new docx file
-	for filename, data := range dt.media {
-		filepath := path.Join("word/media", filename)
-		err := goziputils.WriteFile(zipWriter, filepath, data)
-		if err != nil {
-			return fmt.Errorf("unable to write media file '%s': %w", filepath, err)
-		}
 	}
 
 	relData, err := goziputils.ReadZipFileContent(docxZipMap[documentRelsFilename])

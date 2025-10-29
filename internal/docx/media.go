@@ -13,7 +13,14 @@ const (
 	ImageMediaType = iota + 1
 )
 
-type MediaMap map[string][]byte
+const emusPerInch = 914400.0
+
+type Media struct {
+	Data         []byte
+	WordFilename string
+}
+
+type MediaMap map[string]*Media
 
 type MediaRel struct {
 	Type   uint
@@ -42,7 +49,6 @@ func (d *documentMeta) computeDocxImageSize(imageData []byte) (int, int, error) 
 	newWidth := widthInches * scale
 	newHeight := heightInches * scale
 
-	const emusPerInch = 914400.0
 	cx := int(newWidth * emusPerInch)
 	cy := int(newHeight * emusPerInch)
 	return cx, cy, nil
