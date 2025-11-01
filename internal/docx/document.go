@@ -236,8 +236,6 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 		return nil, fmt.Errorf("unable to parse template in file '%s': %w", f.Name, err)
 	}
 
-	data = preserveWhitespaces(data)
-
 	appliedTemplate := bytes.Buffer{}
 	err = tmpl.Execute(&appliedTemplate, data)
 	if err != nil {
@@ -258,6 +256,8 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 	output = d.replaceTableCellBgColors(output)
 
 	output = flattenNestedTextRuns(output)
+
+	output = ensureXmlSpacePreserve(output)
 
 	output = removeEmptyTableRows(output)
 

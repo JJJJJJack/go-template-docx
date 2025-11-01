@@ -39,6 +39,34 @@ func removeEmptyTableRows(srcXML string) string {
 	})
 }
 
+// ensureXmlSpacePreserve ensures all <w:t> elements with leading/trailing
+// whitespace have the xml:space="preserve" attribute.
+// This is required by Word to preserve spaces; without it, Word collapses whitespace.
+func ensureXmlSpacePreserve(srcXML string) string {
+	textRe := regexp.MustCompile(`<w:t\b([^>]*)>([\s\S]*?)</w:t>`)
+	xmlSpaceRe := regexp.MustCompile(`xml:space="preserve"`)
+
+	return textRe.ReplaceAllStringFunc(srcXML, func(match string) string {
+		submatches := textRe.FindStringSubmatch(match)
+		if len(submatches) < 3 {
+			return match
+		}
+
+		attrs := submatches[1]
+		text := submatches[2]
+
+		// Skip if already has the attribute or doesn't need it
+		hasAttribute := xmlSpaceRe.MatchString(attrs)
+		needsAttribute := text != "" && text != strings.TrimSpace(text)
+
+		if hasAttribute || !needsAttribute {
+			return match
+		}
+
+		return fmt.Sprintf(`<w:t xml:space="preserve">%s</w:t>`, text)
+	})
+}
+
 // flattenNestedTextRuns fixes cases where a template function that returns
 // `<w:rPr>..</w:rPr><w:t>..</w:t>` got injected inside an existing `<w:t>`.
 // That produces invalid nesting like:
@@ -48,18 +76,37 @@ func removeEmptyTableRows(srcXML string) string {
 // Replace it with:
 //
 //	<w:rPr>..</w:rPr><w:t>text</w:t>
+//
+// Preserves the xml:space="preserve" attribute if it exists in either tag.
 func flattenNestedTextRuns(srcXML string) string {
-	// Strictly match <w:t> boundaries to avoid accidentally catching <w:tr>, <w:tc>, etc.
-	nestedRe := regexp.MustCompile(`(?is)<w:t\b[^>]*>\s*(<w:rPr>[\s\S]*?</w:rPr>)\s*<w:t\b[^>]*>([\s\S]*?)</w:t>\s*</w:t>`) // greedy across whitespace
+	nestedRe := regexp.MustCompile(`(?is)<w:t\b([^>]*)>\s*(<w:rPr>[\s\S]*?</w:rPr>)\s*<w:t\b([^>]*)>([\s\S]*?)</w:t>\s*</w:t>`)
+	xmlSpaceRe := regexp.MustCompile(`xml:space="preserve"`)
+
 	for nestedRe.MatchString(srcXML) {
-		srcXML = nestedRe.ReplaceAllString(srcXML, `${1}<w:t>${2}</w:t>`)
+		srcXML = nestedRe.ReplaceAllStringFunc(srcXML, func(match string) string {
+			submatches := nestedRe.FindStringSubmatch(match)
+			if len(submatches) < 5 {
+				return match
+			}
+			outerAttrs := submatches[1]
+			rPr := submatches[2]
+			innerAttrs := submatches[3]
+			text := submatches[4]
+
+			// If either tag had xml:space="preserve", preserve it in the flattened output
+			if xmlSpaceRe.MatchString(outerAttrs) || xmlSpaceRe.MatchString(innerAttrs) {
+				return fmt.Sprintf(`%s<w:t xml:space="preserve">%s</w:t>`, rPr, text)
+			}
+			return fmt.Sprintf(`%s<w:t>%s</w:t>`, rPr, text)
+		})
 	}
+
 	return srcXML
 }
 
 // guardSpaces wraps the input text in
 // <w:t xml:space="preserve">...</w:t> if it has
-// leading or trailing spaces.
+// leading or trailing spaces.<
 func guardSpaces(text string) string {
 	if strings.TrimSpace(text) == text {
 		return text
