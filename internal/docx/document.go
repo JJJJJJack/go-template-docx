@@ -257,6 +257,8 @@ func (d *documentMeta) ApplyTemplate(f *zip.File, zipWriter *zip.Writer, data an
 
 	output = flattenNestedTextRuns(output)
 
+	output = propagateRunPropsAfterBreak(output)
+
 	output = ensureXmlSpacePreserve(output)
 
 	output = removeEmptyTableRows(output)

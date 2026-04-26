@@ -66,6 +66,24 @@ func ensureXmlSpacePreserve(srcXML string) string {
 	})
 }
 
+// propagateRunPropsAfterBreak ensures that <w:r> elements created by breakParagraph
+// inherit the <w:rPr> from the originating run.
+// breakParagraph injects </w:t></w:r></w:p><w:p><w:r><w:t>, producing bare runs with
+// no formatting; this function copies the preceding run's <w:rPr> into each of them.
+func propagateRunPropsAfterBreak(srcXML string) string {
+	// <w:rPr> children in OOXML are always self-closing tags (e.g. <w:sz/>), so we
+	// match only those to avoid accidentally spanning into a sibling <w:rPr> block.
+	re := regexp.MustCompile(`(<w:rPr>[^<]*(?:<[^>]+/>[^<]*)*</w:rPr>)(<w:t[^>]*>[^<]*</w:t></w:r></w:p><w:p><w:r>)<w:t`)
+	for {
+		next := re.ReplaceAllString(srcXML, `${1}${2}${1}<w:t`)
+		if next == srcXML {
+			break
+		}
+		srcXML = next
+	}
+	return srcXML
+}
+
 // flattenNestedTextRuns fixes cases where a template function that returns
 // `<w:rPr>..</w:rPr><w:t>..</w:t>` got injected inside an existing `<w:t>`.
 // That produces invalid nesting like:
