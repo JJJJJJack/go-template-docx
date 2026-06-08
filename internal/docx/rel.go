@@ -9,9 +9,10 @@ const (
 )
 
 type relationshipDetail struct {
-	Type   string `xml:"Type,attr"`
-	Target string `xml:"Target,attr"`
-	Id     string `xml:"Id,attr"`
+	Type       string `xml:"Type,attr"`
+	Target     string `xml:"Target,attr"`
+	TargetMode string `xml:"TargetMode,attr,omitempty"`
+	Id         string `xml:"Id,attr"`
 }
 
 type Relationship struct {
