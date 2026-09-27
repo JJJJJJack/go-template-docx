@@ -13,55 +13,93 @@ import (
 func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 	mediaRels := []MediaRel{}
 
-	imagePlaceholderRE := regexp.MustCompile(`\[\[IMAGE:.*?\]\]`)
-	xmlBlocks := imagePlaceholderRE.FindAllString(srcXML, -1)
-	for _, xmlBlock := range xmlBlocks {
-		filename := strings.TrimPrefix(xmlBlock, "[[IMAGE:")
-		filename = strings.TrimSuffix(filename, "]]")
+	if !strings.Contains(srcXML, "[[IMAGE:") {
+		return srcXML, mediaRels, nil
+	}
 
-		buffer := bytes.Buffer{}
-		docPrId, err := d.RandUniqueDocPrId()
-		if err != nil {
-			return srcXML, mediaRels, fmt.Errorf("unable to get unique docPrId: %w", err)
+	wtRE := regexp.MustCompile(`<w:t(\s[^>]*)?>([^<]*\[\[IMAGE:[^<]*)</w:t>`)
+	imagePlaceholderRE := regexp.MustCompile(`\[\[IMAGE:(.*?)\]\]`)
+
+	var buildErr error
+
+	srcXML = wtRE.ReplaceAllStringFunc(srcXML, func(match string) string {
+		if buildErr != nil {
+			return match
 		}
 
-		rid := d.NextRId()
-		rId := fmt.Sprintf("rId%d", rid)
+		groups := wtRE.FindStringSubmatch(match)
+		attrs := groups[1]
+		content := groups[2]
 
-		imageTemplate, err := template.New("image-template").Parse(imageTemplateXml)
-		if err != nil {
-			return srcXML, mediaRels, err
+		var out strings.Builder
+		lastEnd := 0
+		for _, loc := range imagePlaceholderRE.FindAllStringSubmatchIndex(content, -1) {
+			if text := content[lastEnd:loc[0]]; text != "" {
+				out.WriteString("<w:t" + attrs + ">" + text + "</w:t>")
+			}
+
+			filename := content[loc[2]:loc[3]]
+
+			buffer := bytes.Buffer{}
+			docPrId, err := d.RandUniqueDocPrId()
+			if err != nil {
+				buildErr = fmt.Errorf("unable to get unique docPrId: %w", err)
+				return match
+			}
+
+			rid := d.NextRId()
+			rId := fmt.Sprintf("rId%d", rid)
+
+			imageTemplate, err := template.New("image-template").Parse(imageTemplateXml)
+			if err != nil {
+				buildErr = err
+				return match
+			}
+
+			v, ok := d.mediaMap[filename]
+			if !ok {
+				buildErr = fmt.Errorf("filename '%s' not found in loaded medias", filename)
+				return match
+			}
+
+			cx, cy, err := d.computeDocxImageSize(v.Data)
+			if err != nil {
+				buildErr = fmt.Errorf("unable to compute image size for '%s': %w", filename, err)
+				return match
+			}
+
+			pictureN := fmt.Sprintf("Picture %d", d.NextPictureNumber())
+			err = imageTemplate.Execute(&buffer, XmlImageData{
+				DocPrId: docPrId,
+				Name:    pictureN,
+				RefID:   rId,
+				Cx:      cx,
+				Cy:      cy,
+			})
+			if err != nil {
+				buildErr = fmt.Errorf("unable to execute image template: %w", err)
+				return match
+			}
+
+			mediaRels = append(mediaRels, MediaRel{
+				Type:   ImageMediaType,
+				RefID:  rId,
+				Source: path.Join("media", v.WordFilename),
+			})
+
+			out.WriteString(buffer.String())
+			lastEnd = loc[1]
 		}
 
-		v, ok := d.mediaMap[filename]
-		if !ok {
-			return srcXML, mediaRels, fmt.Errorf("filename '%s' not found in loaded medias", filename)
+		if text := content[lastEnd:]; text != "" {
+			out.WriteString("<w:t" + attrs + ">" + text + "</w:t>")
 		}
 
-		cx, cy, err := d.computeDocxImageSize(v.Data)
-		if err != nil {
-			return srcXML, mediaRels, fmt.Errorf("unable to compute image size for '%s': %w", filename, err)
-		}
+		return out.String()
+	})
 
-		pictureN := fmt.Sprintf("Picture %d", d.NextPictureNumber())
-		err = imageTemplate.Execute(&buffer, XmlImageData{
-			DocPrId: docPrId,
-			Name:    pictureN,
-			RefID:   rId,
-			Cx:      cx,
-			Cy:      cy,
-		})
-		if err != nil {
-			return srcXML, mediaRels, fmt.Errorf("unable to execute image template: %w", err)
-		}
-
-		mediaRels = append(mediaRels, MediaRel{
-			Type:   ImageMediaType,
-			RefID:  rId,
-			Source: path.Join("media", v.WordFilename),
-		})
-
-		srcXML = strings.ReplaceAll(srcXML, xmlBlock, buffer.String())
+	if buildErr != nil {
+		return srcXML, mediaRels, buildErr
 	}
 
 	return srcXML, mediaRels, nil
