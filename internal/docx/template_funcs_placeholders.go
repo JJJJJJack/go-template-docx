@@ -3,6 +3,7 @@ package docx
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"path"
 	"regexp"
 	"strconv"
@@ -13,12 +14,13 @@ import (
 func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 	mediaRels := []MediaRel{}
 
-	if !strings.Contains(srcXML, "[[IMAGE:") {
+	if !strings.Contains(srcXML, "[[IMAGE") {
 		return srcXML, mediaRels, nil
 	}
 
-	wtRE := regexp.MustCompile(`<w:t(\s[^>]*)?>([^<]*\[\[IMAGE:[^<]*)</w:t>`)
-	imagePlaceholderRE := regexp.MustCompile(`\[\[IMAGE:(.*?)\]\]`)
+	wtRE := regexp.MustCompile(`<w:t(\s[^>]*)?>([^<]*\[\[IMAGE[:\[][^<]*)</w:t>`)
+	// [[IMAGE:filename]] or [[IMAGE[options]:filename]]
+	imagePlaceholderRE := regexp.MustCompile(`\[\[IMAGE(?:\[([^\]]*)\])?:(.*?)\]\]`)
 
 	var buildErr error
 
@@ -38,7 +40,18 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 				out.WriteString("<w:t" + attrs + ">" + text + "</w:t>")
 			}
 
-			filename := content[loc[2]:loc[3]]
+			filename := content[loc[4]:loc[5]]
+
+			encodedOptions := ""
+			if loc[2] >= 0 {
+				encodedOptions = content[loc[2]:loc[3]]
+			}
+
+			options, err := decodeImageOptions(encodedOptions)
+			if err != nil {
+				buildErr = fmt.Errorf("unable to apply options for image '%s': %w", filename, err)
+				return match
+			}
 
 			buffer := bytes.Buffer{}
 			docPrId, err := d.RandUniqueDocPrId()
@@ -68,13 +81,18 @@ func (d *documentMeta) applyImages(srcXML string) (string, []MediaRel, error) {
 				return match
 			}
 
+			borderWidthEmu := int(math.Round(options.BorderWidthPt * emusPerPoint))
+
 			pictureN := fmt.Sprintf("Picture %d", d.NextPictureNumber())
 			err = imageTemplate.Execute(&buffer, XmlImageData{
-				DocPrId: docPrId,
-				Name:    pictureN,
-				RefID:   rId,
-				Cx:      cx,
-				Cy:      cy,
+				DocPrId:         docPrId,
+				Name:            pictureN,
+				RefID:           rId,
+				Cx:              cx,
+				Cy:              cy,
+				BorderColor:     options.BorderColor,
+				BorderWidthEmu:  borderWidthEmu,
+				BorderExtentEmu: borderWidthEmu,
 			})
 			if err != nil {
 				buildErr = fmt.Errorf("unable to execute image template: %w", err)

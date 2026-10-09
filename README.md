@@ -74,8 +74,13 @@ optional flags:
   - `{{shadeTextBg .Text .ColorHex}}`
 - `list(v ...interface{}) []interface{}`: creates a slice of interface{} from the variadic parameters, useful to pass a slice to the `styledText` function
   - `{{list "b" "i" "fs:14" "bg:#C0FFEE" "#FF0000"}}`
-- `image(filename string)`: keeps original aspect ratio, the filename parameter looks for an equal loaded `Media`'s filename
+- `image(filename string, options ...string)`: keeps original aspect ratio, the filename parameter looks for an equal loaded `Media`'s filename, optional parameters can be passed after the filename:
+  - `border:#RRGGBB` or `border:RRGGBB`: adds a border with the given color around the image
+  - `borderWidth:N` or `bw:N`: sets the border width in points (default `1`), requires a `border` option
+  - empty options are ignored, so they can be set conditionally from the template values
   - `{{image .ImageFilename}}`
+  - `{{image .ImageFilename "border:#FF0000" "borderWidth:2"}}` to add a red 2pt border to the image
+  - `{{image .ImageFilename .BorderOption}}` with `BorderOption` set to e.g. `"border:#00AA00"` or `""` for no border
 - `replaceImage(filename string)`: the filename parameter looks for an equal loaded `Media`'s filename, it replaces the image inside a `<w:drawing>...</w:drawing>` block, useful to keep the image size and position
   - `{{replaceImage .ImageFilename}}` inside the `alt-text` of the image to replace
 - `preserveNewline(text string)`: newlines are treated as `SHIFT + ENTER` input, thus keeping the text in the same paragraph.
