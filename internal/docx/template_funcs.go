@@ -2,6 +2,7 @@ package docx
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -347,7 +348,7 @@ func (o *imageOptions) validate(funcName string, borderWidthSet bool) error {
 		o.BorderWidthPt = defaultImageBorderWidthPt
 	}
 
-	if o.BorderWidthPt <= 0 || o.BorderWidthPt > maxImageBorderWidthPt {
+	if math.IsNaN(o.BorderWidthPt) || o.BorderWidthPt <= 0 || o.BorderWidthPt > maxImageBorderWidthPt {
 		return fmt.Errorf("%s got invalid border width: %v (must be greater than 0 and at most %v points)", funcName, o.BorderWidthPt, maxImageBorderWidthPt)
 	}
 
