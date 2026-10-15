@@ -35,12 +35,17 @@ const imageTemplateXml = `<w:drawing>
     <wp:effectExtent l="{{.BorderExtentEmu}}" t="{{.BorderExtentEmu}}" r="{{.BorderExtentEmu}}" b="{{.BorderExtentEmu}}" />
     {{- end}}
     <wp:docPr id="{{.DocPrId}}" name="{{.Name}}" />
+		<wp:cNvGraphicFramePr>
+			<a:graphicFrameLocks noChangeAspect="1" />
+		</wp:cNvGraphicFramePr>
     <a:graphic>
       <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
         <pic:pic>
           <pic:nvPicPr>
             <pic:cNvPr id="{{.DocPrId}}" name="{{.Name}}" />
-            <pic:cNvPicPr />
+              <pic:cNvPicPr>
+								<a:picLocks noChangeAspect="1" />
+							</pic:cNvPicPr>
           </pic:nvPicPr>
           <pic:blipFill>
             <a:blip r:embed="{{.RefID}}" />
