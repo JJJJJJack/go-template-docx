@@ -311,7 +311,8 @@ func shadeTextBg(s, hex string) (string, error) {
 }
 
 const (
-	IMAGE_BORDER_PREFIX             = "border:"
+	IMAGE_BORDER_COLOR_PREFIX       = "borderColor:"
+	IMAGE_BORDER_COLOR_PREFIX_SHORT = "bc:"
 	IMAGE_BORDER_WIDTH_PREFIX       = "borderWidth:"
 	IMAGE_BORDER_WIDTH_PREFIX_SHORT = "bw:"
 
@@ -331,15 +332,7 @@ type imageOptions struct {
 
 // validate checks the options consistency and applies the defaults.
 func (o *imageOptions) validate(funcName string, borderWidthSet bool) error {
-	if o.BorderColor == "" {
-		if borderWidthSet {
-			return fmt.Errorf("%s got border width without a border color (add a \"%s#RRGGBB\" option)", funcName, IMAGE_BORDER_PREFIX)
-		}
-
-		return nil
-	}
-
-	if !hexColorRe.MatchString(o.BorderColor) {
+	if o.BorderColor != "" && !hexColorRe.MatchString(o.BorderColor) {
 		return fmt.Errorf("%s got invalid border color: %s (must be 6 hex characters like '0077FF')", funcName, o.BorderColor)
 	}
 	o.BorderColor = strings.ToUpper(o.BorderColor)
@@ -376,12 +369,10 @@ func parseImageOptions(opts []interface{}) (imageOptions, error) {
 		}
 
 		switch {
-		case strings.HasPrefix(opt, IMAGE_BORDER_PREFIX):
-			if options.BorderColor != "" {
-				return options, fmt.Errorf("image got multiple border colors")
-			}
-
-			options.BorderColor = strings.TrimPrefix(strings.TrimPrefix(opt, IMAGE_BORDER_PREFIX), "#")
+		case strings.HasPrefix(opt, IMAGE_BORDER_COLOR_PREFIX), strings.HasPrefix(opt, IMAGE_BORDER_COLOR_PREFIX_SHORT):
+			options.BorderColor = strings.TrimPrefix(opt, IMAGE_BORDER_COLOR_PREFIX_SHORT)
+			options.BorderColor = strings.TrimPrefix(options.BorderColor, IMAGE_BORDER_COLOR_PREFIX)
+			options.BorderColor = strings.TrimPrefix(options.BorderColor, "#")
 			if options.BorderColor == "" {
 				return options, fmt.Errorf("image got empty border color")
 			}
@@ -400,6 +391,9 @@ func parseImageOptions(opts []interface{}) (imageOptions, error) {
 
 			options.BorderWidthPt = width
 			borderWidthSet = true
+			if options.BorderColor == "" {
+				options.BorderColor = "000000"
+			}
 		default:
 			return options, fmt.Errorf("image got unknown option: %s", opt)
 		}

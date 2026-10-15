@@ -75,7 +75,7 @@ optional flags:
 - `list(v ...interface{}) []interface{}`: creates a slice of interface{} from the variadic parameters, useful to pass a slice to the `styledText` function
   - `{{list "b" "i" "fs:14" "bg:#C0FFEE" "#FF0000"}}`
 - `image(filename string, options ...interface{})`: keeps original aspect ratio, the filename parameter looks for an equal loaded `Media`'s filename, optional parameters can be passed after the filename:
-  - `border:#RRGGBB` or `border:RRGGBB`: adds a border with the given color around the image
+  - `borderColor:#RRGGBB` or `borderColor:RRGGBB`: sets the color for the border (default `#000000`), requires a `borderWidth` option
   - `borderWidth:N` or `bw:N`: sets the border width in points (default `1`), requires a `border` option
   - empty options are ignored, so they can be set conditionally from the template values
   - `{{image .ImageFilename}}`
