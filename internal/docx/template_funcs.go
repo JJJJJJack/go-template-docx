@@ -2,6 +2,8 @@ package docx
 
 import (
 	"fmt"
+	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	"text/template"
@@ -13,6 +15,13 @@ type XmlImageData struct {
 	RefID   string
 	Cx      int
 	Cy      int
+	// BorderColor is the RRGGBB border color, empty means no border
+	BorderColor    string
+	BorderWidthEmu int
+	// BorderExtentEmu is the space reserved around the image for the border,
+	// Word draws picture borders entirely outside the image so it must equal the border width
+	// otherwise the border gets clipped by the previous line or covered by adjacent images
+	BorderExtentEmu int
 }
 
 const imageTemplateXml = `<w:drawing>
@@ -22,6 +31,9 @@ const imageTemplateXml = `<w:drawing>
     xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"
     xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
     <wp:extent cx="{{.Cx}}" cy="{{.Cy}}" />
+    {{- if .BorderColor}}
+    <wp:effectExtent l="{{.BorderExtentEmu}}" t="{{.BorderExtentEmu}}" r="{{.BorderExtentEmu}}" b="{{.BorderExtentEmu}}" />
+    {{- end}}
     <wp:docPr id="{{.DocPrId}}" name="{{.Name}}" />
     <a:graphic>
       <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
@@ -44,6 +56,14 @@ const imageTemplateXml = `<w:drawing>
             <a:prstGeom prst="rect">
               <a:avLst />
             </a:prstGeom>
+            {{- if .BorderColor}}
+            <a:ln w="{{.BorderWidthEmu}}">
+              <a:solidFill>
+                <a:srgbClr val="{{.BorderColor}}" />
+              </a:solidFill>
+              <a:miter lim="800000" />
+            </a:ln>
+            {{- end}}
           </pic:spPr>
         </pic:pic>
       </a:graphicData>
@@ -290,9 +310,157 @@ func shadeTextBg(s, hex string) (string, error) {
 	return fmt.Sprintf(SHADING_WRAPPER_F, strings.ToUpper(hex), s), nil
 }
 
+const (
+	IMAGE_BORDER_COLOR_PREFIX       = "borderColor:"
+	IMAGE_BORDER_COLOR_PREFIX_SHORT = "bc:"
+	IMAGE_BORDER_WIDTH_PREFIX       = "borderWidth:"
+	IMAGE_BORDER_WIDTH_PREFIX_SHORT = "bw:"
+
+	defaultImageBorderWidthPt = 1.0
+	// maximum line width allowed by the DrawingML schema (20116800 EMUs)
+	maxImageBorderWidthPt = 1584.0
+	emusPerPoint          = 12700
+)
+
+var hexColorRe = regexp.MustCompile(`^[0-9A-Fa-f]{6}$`)
+
+type imageOptions struct {
+	// BorderColor is the RRGGBB border color, empty means no border
+	BorderColor   string
+	BorderWidthPt float64
+}
+
+// validate checks the options consistency and applies the defaults.
+func (o *imageOptions) validate(funcName string, borderWidthSet bool) error {
+	if o.BorderColor != "" && !hexColorRe.MatchString(o.BorderColor) {
+		return fmt.Errorf("%s got invalid border color: %s (must be 6 hex characters like '0077FF')", funcName, o.BorderColor)
+	}
+	o.BorderColor = strings.ToUpper(o.BorderColor)
+
+	if !borderWidthSet {
+		o.BorderWidthPt = defaultImageBorderWidthPt
+	}
+
+	if math.IsNaN(o.BorderWidthPt) || o.BorderWidthPt <= 0 || o.BorderWidthPt > maxImageBorderWidthPt {
+		return fmt.Errorf("%s got invalid border width: %v (must be greater than 0 and at most %v points)", funcName, o.BorderWidthPt, maxImageBorderWidthPt)
+	}
+
+	return nil
+}
+
+// parseImageOptions parses the options passed to the image template function,
+// nil and empty options are ignored so that they can be optionally set from the template data.
+func parseImageOptions(opts []interface{}) (imageOptions, error) {
+	options := imageOptions{}
+	borderWidthSet := false
+
+	for _, arg := range opts {
+		if arg == nil {
+			continue
+		}
+
+		opt, ok := arg.(string)
+		if !ok {
+			return options, fmt.Errorf("image got non-string option: %v", arg)
+		}
+
+		if opt == "" {
+			continue
+		}
+
+		switch {
+		case strings.HasPrefix(opt, IMAGE_BORDER_COLOR_PREFIX), strings.HasPrefix(opt, IMAGE_BORDER_COLOR_PREFIX_SHORT):
+			options.BorderColor = strings.TrimPrefix(opt, IMAGE_BORDER_COLOR_PREFIX_SHORT)
+			options.BorderColor = strings.TrimPrefix(options.BorderColor, IMAGE_BORDER_COLOR_PREFIX)
+			options.BorderColor = strings.TrimPrefix(options.BorderColor, "#")
+			if options.BorderColor == "" {
+				return options, fmt.Errorf("image got empty border color")
+			}
+		case strings.HasPrefix(opt, IMAGE_BORDER_WIDTH_PREFIX), strings.HasPrefix(opt, IMAGE_BORDER_WIDTH_PREFIX_SHORT):
+			if borderWidthSet {
+				return options, fmt.Errorf("image got multiple border widths")
+			}
+
+			widthStr := strings.TrimPrefix(opt, IMAGE_BORDER_WIDTH_PREFIX)
+			widthStr = strings.TrimPrefix(widthStr, IMAGE_BORDER_WIDTH_PREFIX_SHORT)
+
+			width, err := strconv.ParseFloat(widthStr, 64)
+			if err != nil {
+				return options, fmt.Errorf("image got invalid border width: %s", widthStr)
+			}
+
+			options.BorderWidthPt = width
+			borderWidthSet = true
+			if options.BorderColor == "" {
+				options.BorderColor = "000000"
+			}
+		default:
+			return options, fmt.Errorf("image got unknown option: %s", opt)
+		}
+	}
+
+	return options, options.validate("image", borderWidthSet)
+}
+
+// encode serializes the options inside the image placeholder,
+// e.g. [[IMAGE[border=FF0000;bw=1.5]:filename.png]], the options are placed
+// before the filename so that any character can be used in the filename.
+func (o imageOptions) encode() string {
+	if o.BorderColor == "" {
+		return ""
+	}
+
+	return fmt.Sprintf("[border=%s;bw=%s]", o.BorderColor, strconv.FormatFloat(o.BorderWidthPt, 'f', -1, 64))
+}
+
+// decodeImageOptions parses the options serialized by imageOptions.encode,
+// without the surrounding brackets.
+func decodeImageOptions(s string) (imageOptions, error) {
+	options := imageOptions{}
+	borderWidthSet := false
+
+	if s == "" {
+		return options, nil
+	}
+
+	for _, kv := range strings.Split(s, ";") {
+		key, value, found := strings.Cut(kv, "=")
+		if !found {
+			return options, fmt.Errorf("invalid image placeholder option: %s", kv)
+		}
+
+		switch key {
+		case "border":
+			options.BorderColor = value
+		case "bw":
+			width, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return options, fmt.Errorf("invalid image placeholder border width: %s", value)
+			}
+
+			options.BorderWidthPt = width
+			borderWidthSet = true
+		default:
+			return options, fmt.Errorf("unknown image placeholder option: %s", key)
+		}
+	}
+
+	return options, options.validate("image placeholder", borderWidthSet)
+}
+
 // image wraps a placeholder around the given filename for image insertion in the document.
-func image(filename string) string {
-	return fmt.Sprintf("[[IMAGE:%s]]", filename)
+// Optional styles can be passed after the filename:
+//   - "border:#RRGGBB" adds a border with the given color
+//   - "borderWidth:N" or "bw:N" sets the border width in points (default 1)
+//
+// nil and empty options are ignored.
+func image(filename string, opts ...interface{}) (string, error) {
+	options, err := parseImageOptions(opts)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("[[IMAGE%s:%s]]", options.encode(), filename), nil
 }
 
 // replaceImage insert a placeholder around the given filename for image replacement in the document.
